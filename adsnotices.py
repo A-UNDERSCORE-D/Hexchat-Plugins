@@ -2,6 +2,9 @@ import hexchat
 import re
 from threading import Thread
 from subprocess import run as runprocess
+import sys
+import os
+sys.path = [os.path.join(hexchat.get_info("configdir"), "addons")] + sys.path
 from adhexlib import pref
 from adhexlib import context as con
 
@@ -32,33 +35,25 @@ snotes = {
     "S-Debug": "DEBUG"
 }
 
+allowednets = pref.getpref(__module_name__ + "_allowednetworks")
+ftsnotices = pref.getpref(__module_name__ + "_forwardtosnotices")
+sendvisual = pref.getpref(__module_name__ + "_sendvisual")
 
-commands = {
-    "addnet": None,
-    "delnet": None,
-    "addvisual": None,
-    "delvisual": None,
-    "addsnote": None,
-    "delsnote": None
-}
 
 def onsnotice(word, word_eol, userdata):
     notice = word[1]
-    for network in pref.getpref(__module_name__ + "allowednetworks"):
-        if hexchat.get_info("network").lower() == network:
-            for mask in snotes:
-                if re.match(snoteregex.format(snotes[mask]), notice):
-                    con.printtocontext(">>{}<<".format(mask), notice)
-                    if mask in pref.getpref(__module_name__ + "forwardtosnotices"):
-                        con.printtocontext(">>S-Notices<<", notice)
-                    if mask in pref.getpref(__module_name__ + "sendgnotice"):
-                        sendnotif(notice)
+    if hexchat.get_info("network").lower() in allowednets:
+        for mask in snotes:
+            if re.match(snoteregex.format(snotes[mask]), notice):
+                con.printtocontext(">>{}<<".format(mask), notice)
+                if mask in ftsnotices:
+                    con.printtocontext(">>S-Notices<<", notice)
+                if mask in sendvisual:
+                    sendnotif(notice)
 
-            whois = re.match(whoisregex, notice)
-            if whois:
-                sendwhoisnotice(whois)
-
-    pass
+        whois = re.match(whoisregex, notice)
+        if whois:
+            sendwhoisnotice(whois)
 
 
 def sendwhoisnotice(msg):
@@ -67,12 +62,58 @@ def sendwhoisnotice(msg):
 
 
 def sendnotif(msg):
-    matched = re.match(r"(\*\*\*\s(?:REMOTE)?{}:)?\s(:?From\s.+?:)?.+?$", msg).groups()
+    matched = re.match(r"(\*\*\*\s(?:REMOTE)?.+?:)?\s(:?From\s.+?:)?.+?$", msg).groups()
     Thread(target=lambda: runprocess(["notify-send", "-i", "hexchat", matched[0], matched[1]])).start()
 
 
-def oncmd(word, word_eol, userdata):
+def addnet(net):
+    pref.setpref(__module_name__ + "_allowednetworks", net)
+    global allowednets
+    allowednets = pref.getpref(__module_name__ + "_allowednetworks")
 
+
+def delnet(net):
+    pref.removepref(__module_name__ + "_allowednetworks", net)
+    global allowednets
+    allowednets = pref.getpref(__module_name__ + "_allowednetworks")
+
+
+def addvisual(snotice):
+    pref.appendpref(__module_name__ + "_sendvisual", snotice)
+    global sendvisual
+    sendvisual = pref.getpref(__module_name__ + "_sendvisual")
+
+
+def delvisual(snotice):
+    pref.removepref(__module_name__ + "_sendvisual", snotice)
+    global sendvisual
+    sendvisual = pref.getpref(__module_name__ + "_sendvisual")
+
+
+def addsnote(snotice):
+    pref.appendpref(__module_name__ + "_forwardtosnotices", snotice)
+    global ftsnotices
+    ftsnotices = pref.getpref(__module_name__ + "_forwardtosnotices")
+
+
+def delsnote(snotice):
+    pref.removepref(__module_name__ + "_forwardtosnotices", snotice)
+    global ftsnotices
+    ftsnotices = pref.getpref(__module_name__ + "_forwardtosnotices")
+
+commands = {
+    "addnet": addnet,
+    "delnet": delnet,
+    "addvisual": addvisual,
+    "delvisual": delvisual,
+    "addsnote": addsnote,
+    "delsnote": delsnote
+}
+
+
+def oncmd(word, word_eol, userdata):
+    if word[1] in commands:
+        commands[word[1]](word[2:])
 
 
 @hexchat.hook_unload
