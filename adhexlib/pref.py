@@ -29,3 +29,18 @@ def appendpref(name: str, data: Union(list, str)):
     else:
         raise TypeError("unexpected type for data: {}".format(str(type(data))))
 
+
+def removepref(name: str, data: Union(list, str)):
+    temp = getpref(name)
+    if type(data) is str:
+        if data in temp:
+            temp.remove(data)
+            setpref(name, temp)
+    elif type(data) is list:
+        changed = False
+        for item in data:
+            if item in temp:
+                temp.remove(item)
+                changed = True
+        if changed:
+            setpref(name, temp)
