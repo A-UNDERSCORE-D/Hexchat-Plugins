@@ -15,8 +15,6 @@ __module_version__ = "2.0"
 whoisregex = r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)\s(did\sa\s/whois\son\syou)"
 snoteregex = r"\*\*\*\s(:?REMOTE)?{}?:.*?$"
 
-# TODO: update plugin prefs when changing rather than querying each time
-
 snotes = {
     "S-Kills": "KILL",
     "S-Xlines": "XLINE",
@@ -38,10 +36,12 @@ snotes = {
 allowednets = pref.getpref(__module_name__ + "_allowednetworks")
 ftsnotices = pref.getpref(__module_name__ + "_forwardtosnotices")
 sendvisual = pref.getpref(__module_name__ + "_sendvisual")
+blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
 
 
 def onsnotice(word, word_eol, userdata):
-    notice = word[1]
+    notice = word[0]
+    eat = False
     if hexchat.get_info("network").lower() in allowednets:
         for mask in snotes:
             if re.match(snoteregex.format(snotes[mask]), notice):
@@ -50,10 +50,15 @@ def onsnotice(word, word_eol, userdata):
                     con.printtocontext(">>S-Notices<<", notice)
                 if mask in sendvisual:
                     sendnotif(notice)
+                eat = True
 
         whois = re.match(whoisregex, notice)
         if whois:
             sendwhoisnotice(whois)
+
+        if eat:
+            eat = False
+            return hexchat.EAT_ALL
 
 
 def sendwhoisnotice(msg):
@@ -62,12 +67,29 @@ def sendwhoisnotice(msg):
 
 
 def sendnotif(msg):
-    matched = re.match(r"(\*\*\*\s(?:REMOTE)?.+?:)?\s(:?From\s.+?:)?.+?$", msg).groups()
-    Thread(target=lambda: runprocess(["notify-send", "-i", "hexchat", matched[0], matched[1]])).start()
+    smsg = msg.split()
+    title = ""
+    body = ""
+
+    if "REMOTE" in msg:
+        title = " ".join(smsg[1:4])
+        body = " ".join(smsg[4:])
+    elif smsg[1] == "GLOBOPS:":
+        title = " ".join(smsg[1:4])
+        body = " ".join(smsg[4:])
+    else:
+        title = smsg[1]
+        body = " ".join(smsg[2:])
+
+    for block in blockvisual:
+        if block.lower() in body.lower():
+            return
+
+    Thread(target=lambda: runprocess(["notify-send", "-i", "hexchat", title, body])).start()
 
 
 def addnet(net):
-    pref.setpref(__module_name__ + "_allowednetworks", net)
+    pref.appendprefunique(__module_name__ + "_allowednetworks", net)
     global allowednets
     allowednets = pref.getpref(__module_name__ + "_allowednetworks")
 
@@ -79,7 +101,7 @@ def delnet(net):
 
 
 def addvisual(snotice):
-    pref.appendpref(__module_name__ + "_sendvisual", snotice)
+    pref.appendprefunique(__module_name__ + "_sendvisual", snotice)
     global sendvisual
     sendvisual = pref.getpref(__module_name__ + "_sendvisual")
 
@@ -90,8 +112,31 @@ def delvisual(snotice):
     sendvisual = pref.getpref(__module_name__ + "_sendvisual")
 
 
+def addblockvisual(block):
+    blockstr = " ".join(block).lower()
+    temp = pref.getpref(__module_name__ + "_blockvisual", "|")
+    if blockstr not in temp:
+        pref.setpref(__module_name__ + "_blockvisual", temp + [blockstr], "|")
+        global blockvisual
+        blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
+        print(blockstr, "Added to list")
+
+
+def delblockvisual(block):
+    blockstr = " ".join(block).lower()
+    temp = pref.getpref(__module_name__ + "_blockvisual", "|")
+    if blockstr in temp:
+        temp.remove(blockstr)
+        print(temp)
+        pref.setpref(__module_name__ + "_blockvisual", temp, "|")
+        global blockvisual
+        blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
+    else:
+        print(blockstr, "not found in the list")
+
+
 def addsnote(snotice):
-    pref.appendpref(__module_name__ + "_forwardtosnotices", snotice)
+    pref.appendprefunique(__module_name__ + "_forwardtosnotices", snotice)
     global ftsnotices
     ftsnotices = pref.getpref(__module_name__ + "_forwardtosnotices")
 
@@ -104,16 +149,26 @@ def delsnote(snotice):
 commands = {
     "addnet": addnet,
     "delnet": delnet,
+    "listnet": lambda x: print("networks:", ", ".join(allowednets)),
     "addvisual": addvisual,
     "delvisual": delvisual,
+    "listvisual": lambda x: print("Snotes that are sent visually:", ", ".join(sendvisual)),
     "addsnote": addsnote,
-    "delsnote": delsnote
+    "delsnote": delsnote,
+    "listsnote": lambda x: print("Snotes forwarded to >>S-Notices<<:", " ,".join(ftsnotices)),
+    "addblockvisual": addblockvisual,
+    "delblockvisual": delblockvisual,
+    "listblockvisual": lambda x: print("Strings that are blocked in visual snotes:", ", ".join(blockvisual))
 }
 
 
 def oncmd(word, word_eol, userdata):
-    if word[1] in commands:
-        commands[word[1]](word[2:])
+    if len(word) < 2:
+        hexchat.command("HELP SNOTE")
+    elif word[1] in commands:
+        print((word[2:] if len(word) >= 3 else None))
+        commands[word[1]]((word[2:] if len(word) >= 3 else None))
+    return hexchat.EAT_ALL
 
 
 @hexchat.hook_unload
@@ -121,4 +176,5 @@ def onunload(userdata):
     print(__module_name__, "plugin unloaded")
 
 hexchat.hook_print("Server Notice", onsnotice)
+hexchat.hook_command("SNOTE", oncmd, help="test")
 print(__module_name__, "plugin loaded")
