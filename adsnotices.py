@@ -10,7 +10,7 @@ from adhexlib import context as con
 
 __module_name__ = "adsnomasksDEV"
 __module_description__ = "Sorts inspircd snotices into different queries, and sends specific ones to notify-send"
-__module_version__ = "2.0"
+__module_version__ = "2.1"
 
 whoisregex = r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)\s(did\sa\s/whois\son\syou)"
 snoteregex = r"\*\*\*\s(:?REMOTE)?{}?:.*?$"
@@ -57,7 +57,6 @@ def onsnotice(word, word_eol, userdata):
             sendwhoisnotice(whois)
 
         if eat:
-            eat = False
             return hexchat.EAT_ALL
 
 
@@ -112,27 +111,53 @@ def delvisual(snotice):
     sendvisual = pref.getpref(__module_name__ + "_sendvisual")
 
 
-def addblockvisual(block):
-    blockstr = " ".join(block).lower()
-    temp = pref.getpref(__module_name__ + "_blockvisual", "|")
-    if blockstr not in temp:
-        pref.setpref(__module_name__ + "_blockvisual", temp + [blockstr], "|")
-        global blockvisual
-        blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
-        print(blockstr, "Added to list")
+# def addblockvisual(block):
+#     blockstr = " ".join(block).lower()
+#     temp = pref.getpref(__module_name__ + "_blockvisual", "|")
+#     if blockstr not in temp:
+#         pref.setpref(__module_name__ + "_blockvisual", temp + [blockstr], "|")
+#         global blockvisual
+#         blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
+#         print(blockstr, "Added to list")
+#
+#
+# def delblockvisual(block):
+#     blockstr = " ".join(block).lower()
+#     temp = pref.getpref(__module_name__ + "_blockvisual", "|")
+#     changed = False
+#     global blockvisual
+#     if "|" in blockstr:
+#         print("Splitting", blockstr)
+#         for blocks in blockstr.split("|"):
+#             print(blocks)
+#             temp.remove(blocks)
+#             print(temp)
+#             changed = True
+#
+#     elif blockstr in temp:
+#         temp.remove(blockstr)
+#         print(temp)
+#         changed = True
+#     else:
+#         print(blockstr, "not found in the list")
+#
+#     if changed:
+#         pref.setpref(__module_name__ + "_blockvisual", temp, "|")
+#         blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
+#         print("setting to :", temp)
+#     print("nothing happened")
 
 
-def delblockvisual(block):
-    blockstr = " ".join(block).lower()
-    temp = pref.getpref(__module_name__ + "_blockvisual", "|")
-    if blockstr in temp:
-        temp.remove(blockstr)
-        print(temp)
-        pref.setpref(__module_name__ + "_blockvisual", temp, "|")
-        global blockvisual
-        blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
-    else:
-        print(blockstr, "not found in the list")
+def addblockvisualtest(block):
+    pref.appendpref(__module_name__ + "_blockvisual", block, "|")
+    global blockvisual
+    blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
+
+
+def delblockvisualtest(block):
+    pref.removepref(__module_name__ + "_blockvisual", block, "|")
+    global blockvisual
+    blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
 
 
 def addsnote(snotice):
@@ -156,9 +181,10 @@ commands = {
     "addsnote": addsnote,
     "delsnote": delsnote,
     "listsnote": lambda x: print("Snotes forwarded to >>S-Notices<<:", " ,".join(ftsnotices)),
-    "addblockvisual": addblockvisual,
-    "delblockvisual": delblockvisual,
-    "listblockvisual": lambda x: print("Strings that are blocked in visual snotes:", ", ".join(blockvisual))
+    "addblockvisual": addblockvisualtest,
+    "delblockvisual": delblockvisualtest,
+    "listblockvisual": lambda x: print("Strings that are blocked in visual snotes: ",
+                                       "\"{}".format("\", \"".join(blockvisual)))
 }
 
 
@@ -166,8 +192,9 @@ def oncmd(word, word_eol, userdata):
     if len(word) < 2:
         hexchat.command("HELP SNOTE")
     elif word[1].lower() in commands:
-        print((word[2:] if len(word) >= 3 else None))
         commands[word[1]]((word[2:] if len(word) >= 3 else None))
+    else:
+        hexchat.command("HELP SNOTE")
     return hexchat.EAT_ALL
 
 
