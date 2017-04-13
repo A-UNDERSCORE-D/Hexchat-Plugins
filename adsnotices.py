@@ -165,7 +165,7 @@ commands = {
 def oncmd(word, word_eol, userdata):
     if len(word) < 2:
         hexchat.command("HELP SNOTE")
-    elif word[1] in commands:
+    elif word[1].lower() in commands:
         print((word[2:] if len(word) >= 3 else None))
         commands[word[1]]((word[2:] if len(word) >= 3 else None))
     return hexchat.EAT_ALL
@@ -176,5 +176,5 @@ def onunload(userdata):
     print(__module_name__, "plugin unloaded")
 
 hexchat.hook_print("Server Notice", onsnotice)
-hexchat.hook_command("SNOTE", oncmd, help="test")
+hexchat.hook_command("SNOTE", oncmd, help="USAGE: /SNOTE ADD/DEL/LIST NET|VISUAL|SNOTE|BLOCKVISUAL")
 print(__module_name__, "plugin loaded")
