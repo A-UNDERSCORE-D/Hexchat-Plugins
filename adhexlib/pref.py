@@ -1,5 +1,4 @@
 import hexchat
-from typing import Union
 
 
 def setpref(name: str, data, split: str =None):
