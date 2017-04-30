@@ -1,0 +1,70 @@
+import hexchat
+import random
+__module_name__ = "admisc"
+__module_version__ = "1.0"
+__module_description__ = "This script holds all my random things " \
+                         "that don't fit anywhere else"
+
+print("moduld loaded: admisc")
+
+
+def poke(word, word_eol, userdata):
+    pokes = ["with a stick", "with a twig"]
+    innick = word[1]
+    hexchat.command("me pokes {} {}".format(innick, random.choice(pokes)))
+    return hexchat.EAT_ALL
+
+
+def slap(word, word_eol, userdata):
+    innick = word[1]
+    inchan = hexchat.get_info("channel")
+    inserver = hexchat.get_info("server")
+    innetwork = hexchat.get_info("network")
+    slaps = [
+             "pokes {nick} with a tazer",
+             "hurls the holy hand grenade of antioch at {nick}",
+             "clears {nick}'s head with the help of a baseball bat",
+             "applies a small amount of acid to {nick}",
+             "begins to plot {nick}'s demise",
+             "starts planning an accident for {nick}",
+             "stores all of {nick}'s data on floppies next to an extremely "
+             "strong magnet",
+             "Throws a CRT monitor at {nick}",
+             "sends all of {nick}'s usernames and passwords to {chan}",
+             "drops a piano on {nick}",
+             "drops a complete hardcopy log of {chan} on {nick}",
+             "drops a 100TB NAS on {nick}",
+             "drops {chan} on {nick}",
+             "drops {nick} on {nick}",
+             "shreds {nick}'s ram while their system is running",
+             "slaps {nick} around with some soviet propaganda",
+             "slaps {nick} with a sheet of {chan} propaganda",
+             "drops the network on {nick}",
+             "drops {network} on {nick}",
+             "drops a server on {nick}",
+             "drops {server} on {nick}",
+             "causes a netsplit and blames {nick}",
+             "splits out {server} and blames {nick}",
+             "drops a planet on {nick}",
+             "drops LV-426 on {nick}",
+             "throws {nick} into a supermassive black hole",
+             "throws {nick} into Sagittarius A*",
+             "hits {nick} with a small moon",
+             "covers {nick} in chlorine trifluoride, steps back and watches "
+             "them burn",
+             "drops {nick} into Mount Doom",
+             "makes all {nick}'s messages be sent as WALLOPs",
+             "makes all of {nick}'s messages be sent via WALLCHAN"
+             ]
+    hexchat.command("me {}".format(random.choice(slaps).format(nick=innick,
+                    chan=inchan, server=inserver, network=innetwork)))
+    return hexchat.EAT_ALL
+
+
+@hexchat.hook_unload
+def onunload(userdata):
+    print(__module_name__, "plugin loaded")
+
+hexchat.hook_command("poke", poke)
+hexchat.hook_command("slap", slap)
+print(__module_name__, "plugin loaded")
