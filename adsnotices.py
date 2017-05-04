@@ -89,7 +89,7 @@ def sendnotif(msg):
 
     Thread(target=lambda: runprocess(
         ["notify-send", "-i", "hexchat", "--hint=int:transient:1",
-         title, body])
+         title.replace("\x02", ""), body.replace("\x02", "")])
            ).start()
 
 
