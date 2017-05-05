@@ -7,6 +7,9 @@ __module_version__ = "0.5"
 kills = [
     "Roy Mustang puts on his ignition gloves and clicks his fingers in your "
     "direction. FWOOSH!",
+    "It's a terrible day for rain.",
+    "You know how hard it is for me to shake the disease that takes a hold "
+    "of my tongue in situations like these",
     "Here, have my axe.",
     "Hold this for me?",
     "Hey! catch!",
