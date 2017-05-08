@@ -57,6 +57,7 @@ def onsnotice(word, word_eol, userdata):
         whois = re.match(whoisregex, notice)
         if whois:
             sendwhoisnotice(whois)
+            hexchat.command("WHOIS {0} {0}".format(whois.group(1).split()[1]))
 
         if eat:
             return hexchat.EAT_ALL
