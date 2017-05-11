@@ -4,11 +4,12 @@ from threading import Thread
 from subprocess import run as runprocess
 import sys
 import os
+import time
 sys.path = [os.path.join(hexchat.get_info("configdir"), "addons")] + sys.path
 from adhexlib import pref
 from adhexlib import context as con
 
-__module_name__ = "adsnomasksDEV"
+__module_name__ = "adsnomasks"
 __module_description__ = "Sorts inspircd snotices into different queries, " \
                          "and sends specific ones to notify-send"
 __module_version__ = "2.1"
@@ -16,6 +17,8 @@ __module_version__ = "2.1"
 whoisregex = r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)\s" \
              r"(did\sa\s/whois\son\syou)"
 snoteregex = r"\*\*\*\s(:?REMOTE)?{}?:.*?$"
+TIMEOUT = 60
+users = {}
 
 snotes = {
     "S-Kills": "KILL",
@@ -57,7 +60,7 @@ def onsnotice(word, word_eol, userdata):
         whois = re.match(whoisregex, notice)
         if whois:
             sendwhoisnotice(whois)
-            hexchat.command("WHOIS {0} {0}".format(whois.group(1).split()[1]))
+            counterwhois(whois.group(1).split()[1])
 
         if eat:
             return hexchat.EAT_ALL
@@ -67,6 +70,16 @@ def sendwhoisnotice(msg):
     hexchat.command("RECV :whois!whois@whois NOTICE "
                     "{mynick} :{nmsg}".format(mynick=hexchat.get_info("nick"),
                                               nmsg=" ".join(msg.groups())))
+
+
+def counterwhois(nick):
+    if nick in users:
+        if time.time() - users[nick] <= TIMEOUT:
+            users[nick] = time.time()
+            return
+    else:
+        users[nick] = time.time()
+    hexchat.command("WHOIS {0} {0}".format(nick))
 
 
 def sendnotif(msg):
@@ -155,9 +168,8 @@ commands = {
                                  " ,".join(ftsnotices)),
     "addblockvisual": addblockvisualtest,
     "delblockvisual": delblockvisualtest,
-    "listblockvisual": lambda x: print("Strings that are blocked in visual "
-                                       "snotes: ",
-                                       "\"{}".format(
+    "listblockvisual": lambda x: print(
+        "Strings that are blocked in visual snotes: ", "\"{}".format(
                                            "\", \"".join(blockvisual)))
 }
 
