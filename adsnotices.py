@@ -2,20 +2,16 @@ import hexchat
 import re
 from threading import Thread
 from subprocess import run as runprocess
-import sys
-import os
 import time
-sys.path = [os.path.join(hexchat.get_info("configdir"), "addons")] + sys.path
-from adhexlib import pref
-from adhexlib import context as con
+import json
 
-__module_name__ = "adsnomasks"
+__module_name__ = "adsnotices"
 __module_description__ = "Sorts inspircd snotices into different queries, " \
                          "and sends specific ones to notify-send"
-__module_version__ = "2.1"
+__module_version__ = "2.2"
 
-whoisregex = r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)\s" \
-             r"(did\sa\s/whois\son\syou)"
+whoisregex = re.compile(r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)"
+                        r"\s(did\sa\s/whois\son\syou)")
 snoteregex = r"\*\*\*\s(:?REMOTE)?{}?:.*?$"
 TIMEOUT = 60
 users = {}
@@ -38,11 +34,6 @@ snotes = {
     "S-Debug": "DEBUG"
 }
 
-allowednets = pref.getpref(__module_name__ + "_allowednetworks")
-ftsnotices = pref.getpref(__module_name__ + "_forwardtosnotices")
-sendvisual = pref.getpref(__module_name__ + "_sendvisual")
-blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
-
 
 def onsnotice(word, word_eol, userdata):
     notice = word[0]
@@ -50,14 +41,12 @@ def onsnotice(word, word_eol, userdata):
     if hexchat.get_info("network").lower() in allowednets:
         for mask in snotes:
             if re.match(snoteregex.format(snotes[mask]), notice):
-                con.printtocontext(">>{}<<".format(mask), notice)
-                if mask in ftsnotices:
-                    con.printtocontext(">>S-Notices<<", notice)
+                printtocontext(">>{}<<".format(mask), notice)
                 if mask in sendvisual:
                     sendnotif(notice)
                 eat = True
 
-        whois = re.match(whoisregex, notice)
+        whois = whoisregex.match(notice)
         if whois:
             sendwhoisnotice(whois)
             counterwhois(whois.group(1).split()[1])
@@ -108,51 +97,33 @@ def sendnotif(msg):
 
 
 def addnet(net):
-    pref.appendprefunique(__module_name__ + "_allowednetworks", net)
     global allowednets
-    allowednets = pref.getpref(__module_name__ + "_allowednetworks")
+    allowednets = appendpref("allowednetworks", net)
 
 
 def delnet(net):
-    pref.removepref(__module_name__ + "_allowednetworks", net)
     global allowednets
-    allowednets = pref.getpref(__module_name__ + "_allowednetworks")
+    allowednets = removepref("allowednetworks", net)
 
 
 def addvisual(snotice):
-    pref.appendprefunique(__module_name__ + "_sendvisual", snotice)
     global sendvisual
-    sendvisual = pref.getpref(__module_name__ + "_sendvisual")
+    sendvisual = appendpref("sendvisual", snotice)
 
 
 def delvisual(snotice):
-    pref.removepref(__module_name__ + "_sendvisual", snotice)
     global sendvisual
-    sendvisual = pref.getpref(__module_name__ + "_sendvisual")
+    sendvisual = removepref("sendvisual", snotice)
 
 
 def addblockvisualtest(block):
-    pref.appendpref(__module_name__ + "_blockvisual", block, "|")
     global blockvisual
-    blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
+    blockvisual = appendpref("blockvisual", block)
 
 
 def delblockvisualtest(block):
-    pref.removepref(__module_name__ + "_blockvisual", block, "|")
     global blockvisual
-    blockvisual = pref.getpref(__module_name__ + "_blockvisual", "|")
-
-
-def addsnote(snotice):
-    pref.appendprefunique(__module_name__ + "_forwardtosnotices", snotice)
-    global ftsnotices
-    ftsnotices = pref.getpref(__module_name__ + "_forwardtosnotices")
-
-
-def delsnote(snotice):
-    pref.removepref(__module_name__ + "_forwardtosnotices", snotice)
-    global ftsnotices
-    ftsnotices = pref.getpref(__module_name__ + "_forwardtosnotices")
+    blockvisual = removepref("blockvisual", block)
 
 commands = {
     "addnet": addnet,
@@ -162,10 +133,7 @@ commands = {
     "delvisual": delvisual,
     "listvisual": lambda x: print("Snotes that are sent visually:",
                                   ", ".join(sendvisual)),
-    "addsnote": addsnote,
-    "delsnote": delsnote,
-    "listsnote": lambda x: print("Snotes forwarded to >>S-Notices<<:",
-                                 " ,".join(ftsnotices)),
+
     "addblockvisual": addblockvisualtest,
     "delblockvisual": delblockvisualtest,
     "listblockvisual": lambda x: print(
@@ -178,10 +146,59 @@ def oncmd(word, word_eol, userdata):
     if len(word) < 2:
         hexchat.command("HELP SNOTE")
     elif word[1].lower() in commands:
-        commands[word[1]]((word[2:] if len(word) >= 3 else None))
+        commands[word[1]]((" ".join(word[2:]) if len(word) >= 3 else None))
     else:
         hexchat.command("HELP SNOTE")
     return hexchat.EAT_ALL
+
+
+def getpref(name, default: list =[]):
+    name = __module_name__ + "_" + name
+    temp = hexchat.get_pluginpref(name)
+    if not temp:
+        hexchat.set_pluginpref(name, json.dumps(default))
+        return default
+    return json.loads(temp)
+
+
+def setpref(name, data):
+    name = __module_name__ + "_" + name
+    data = json.dumps(data)
+    hexchat.set_pluginpref(name, data)
+    return data
+
+
+def appendpref(name, data):
+    temp = getpref(name)
+    temp.append(data)
+    setpref(name, temp)
+    return temp
+
+
+def removepref(name, data):
+    temp = getpref(name)
+    if data in temp:
+        temp.remove(data)
+        setpref(name, temp)
+    else:
+        print("{} not found".format(data))
+    return temp
+
+
+allowednets = getpref("allowednetworks")
+sendvisual = getpref("sendvisual",
+                     ['S-Globops', 'S-Links', 'S-Announcements', 'S-Operov',
+                      'S-OperLogs', 'S-Floods', 'S-Opers'])
+
+blockvisual = getpref("blockvisual")
+
+
+def printtocontext(name, msg):
+    if hexchat.find_context(hexchat.get_info("network"), name):
+        hexchat.find_context(hexchat.get_info("network"), name).prnt(msg)
+    else:
+        hexchat.command("QUERY -nofocus {}".format(name))
+        hexchat.find_context(hexchat.get_info("network"), name).prnt(msg)
 
 
 @hexchat.hook_unload
@@ -190,5 +207,5 @@ def onunload(userdata):
 
 hexchat.hook_print("Server Notice", onsnotice)
 hexchat.hook_command("SNOTE", oncmd, help="USAGE: /SNOTE ADD/DEL/LIST "
-                                          "NET|VISUAL|SNOTE|BLOCKVISUAL")
+                                          "NET|VISUAL|BLOCKVISUAL")
 print(__module_name__, "plugin loaded")
