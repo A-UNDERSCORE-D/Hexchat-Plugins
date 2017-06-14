@@ -42,7 +42,7 @@ def onsnotice(word, word_eol, userdata):
             if re.match(snoteregex.format(snotes[mask]), notice):
                 printtocontext(">>{}<<".format(mask), notice)
                 if mask.lower() in sendvisual:
-                    sendnotif(notice)
+                    sendnotif(notice, mask.lower())
                 eat = True
 
         whois = whoisregex.match(notice)
@@ -70,7 +70,7 @@ def counterwhois(nick):
     hexchat.command("WHOIS {0} {0}".format(nick))
 
 
-def sendnotif(msg):
+def sendnotif(msg, ntype):
     smsg = msg.split()
 
     if "REMOTE" in msg:
@@ -83,9 +83,18 @@ def sendnotif(msg):
         title = smsg[1]
         body = " ".join(smsg[2:])
 
-    for block in blockvisual:
-        if block.lower() in body.lower():
-            return
+    def checkblock(iblock):
+        return iblock.lower() == body.lower()
+
+    if ntype in blockvisual:
+        for block in blockvisual[ntype]:
+            if checkblock(block):
+                return
+
+    elif "all" in blockvisual:
+        for block in blockvisual["all"]:
+            if checkblock(block):
+                return
 
     subprocess.Popen(["notify-send", "-i", "hexchat", "--hint=int:transient:1",
                       title.replace("\x02", ""), body.replace("\x02", "")])
@@ -113,12 +122,22 @@ def delvisual(snotice):
 
 def addblockvisual(block):
     global blockvisual
-    blockvisual = appendpref("blockvisual", block)
+    if len(block.split()) >= 2:
+        key, block = block.split(None, 1)
+    else:
+        print("I require an argument")
+        return
+    blockvisual = appendpref("blockvisual", block, key=key)
 
 
 def delblockvisual(block):
     global blockvisual
-    blockvisual = removepref("blockvisual", block)
+    if len(block.split()) >= 2:
+        key, block = block.split(None, 1)
+    else:
+        print("I require an argument")
+        return
+    blockvisual = removepref("blockvisual", block, key=key)
 
 commands = {
     "addnet": addnet,
@@ -147,7 +166,9 @@ def oncmd(word, word_eol, userdata):
     return hexchat.EAT_ALL
 
 
-def getpref(name, default: list =[]):
+def getpref(name, default=None):
+    if default is None:
+        default = []
     name = __module_name__ + "_" + name
     temp = hexchat.get_pluginpref(name)
     if not temp:
@@ -167,7 +188,10 @@ def appendpref(name, data, key=None):
     if isinstance(temp, list):
         temp.append(data)
     elif isinstance(temp, dict):
-        temp[key].append(data)
+        if key in temp:
+            temp[key].append(data)
+        else:
+            temp[key] = [data]
     else:
         print("unknown data type")
     setpref(name, temp)
@@ -184,19 +208,25 @@ def removepref(name, data, key=None):
             print("{} not found".format(data))
 
     elif isinstance(temp, dict):
-        if data in temp[key]:
-            temp[key].remove(data)
+        if key in temp:
+            if data in temp[key]:
+                temp[key].remove(data)
+                if not temp[key]:
+                    del temp[key]
+                setpref(name, temp)
+            else:
+                print("{} not found".format(data))
         else:
-            print("{} not found".format(data))
+            print("{} not found".format(key))
     return temp
 
 
 allowednets = getpref("allowednetworks")
 sendvisual = getpref("sendvisual",
-                     ['S-Globops', 'S-Links', 'S-Announcements', 'S-Operov',
-                      'S-OperLogs', 'S-Floods', 'S-Opers'])
+                     ['s-globops', 's-links', 's-announcements', 's-operov',
+                      's-operlogs', 's-floods', 's-opers'])
 
-blockvisual = getpref("blockvisual")
+blockvisual = getpref("blockvisual", {})
 
 
 def printtocontext(name, msg):
