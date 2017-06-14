@@ -1,7 +1,6 @@
 import hexchat
 import re
-from threading import Thread
-from subprocess import run as runprocess
+import subprocess
 import time
 import json
 
@@ -13,7 +12,7 @@ __module_version__ = "2.2"
 whoisregex = re.compile(r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)"
                         r"\s(did\sa\s/whois\son\syou)")
 snoteregex = r"\*\*\*\s(:?REMOTE)?{}?:.*?$"
-TIMEOUT = 60
+TIMEOUT = 180 
 users = {}
 
 snotes = {
@@ -42,7 +41,7 @@ def onsnotice(word, word_eol, userdata):
         for mask in snotes:
             if re.match(snoteregex.format(snotes[mask]), notice):
                 printtocontext(">>{}<<".format(mask), notice)
-                if mask in sendvisual:
+                if mask.lower() in sendvisual:
                     sendnotif(notice)
                 eat = True
 
@@ -73,8 +72,6 @@ def counterwhois(nick):
 
 def sendnotif(msg):
     smsg = msg.split()
-    title = ""
-    body = ""
 
     if "REMOTE" in msg:
         title = " ".join(smsg[1:4])
@@ -90,10 +87,8 @@ def sendnotif(msg):
         if block.lower() in body.lower():
             return
 
-    Thread(target=lambda: runprocess(
-        ["notify-send", "-i", "hexchat", "--hint=int:transient:1",
-         title.replace("\x02", ""), body.replace("\x02", "")])
-           ).start()
+    subprocess.Popen(["notify-send", "-i", "hexchat", "--hint=int:transient:1",
+                      title.replace("\x02", ""), body.replace("\x02", "")])
 
 
 def addnet(net):
@@ -116,12 +111,12 @@ def delvisual(snotice):
     sendvisual = removepref("sendvisual", snotice)
 
 
-def addblockvisualtest(block):
+def addblockvisual(block):
     global blockvisual
     blockvisual = appendpref("blockvisual", block)
 
 
-def delblockvisualtest(block):
+def delblockvisual(block):
     global blockvisual
     blockvisual = removepref("blockvisual", block)
 
@@ -134,11 +129,11 @@ commands = {
     "listvisual": lambda x: print("Snotes that are sent visually:",
                                   ", ".join(sendvisual)),
 
-    "addblockvisual": addblockvisualtest,
-    "delblockvisual": delblockvisualtest,
+    "addblockvisual": addblockvisual,
+    "delblockvisual": delblockvisual,
     "listblockvisual": lambda x: print(
-        "Strings that are blocked in visual snotes: ", "\"{}".format(
-                                           "\", \"".join(blockvisual)))
+        "Strings that are blocked in visual snotes:", "\"{}".format(
+                                           "\", \"".join(blockvisual)) + "\"")
 }
 
 
@@ -157,7 +152,6 @@ def getpref(name, default: list =[]):
     temp = hexchat.get_pluginpref(name)
     if not temp:
         hexchat.set_pluginpref(name, json.dumps(default))
-        return default
     return json.loads(temp)
 
 
@@ -168,20 +162,32 @@ def setpref(name, data):
     return data
 
 
-def appendpref(name, data):
+def appendpref(name, data, key=None):
     temp = getpref(name)
-    temp.append(data)
+    if isinstance(temp, list):
+        temp.append(data)
+    elif isinstance(temp, dict):
+        temp[key].append(data)
+    else:
+        print("unknown data type")
     setpref(name, temp)
     return temp
 
 
-def removepref(name, data):
+def removepref(name, data, key=None):
     temp = getpref(name)
-    if data in temp:
-        temp.remove(data)
-        setpref(name, temp)
-    else:
-        print("{} not found".format(data))
+    if isinstance(temp, list):
+        if data in temp:
+            temp.remove(data)
+            setpref(name, temp)
+        else:
+            print("{} not found".format(data))
+
+    elif isinstance(temp, dict):
+        if data in temp[key]:
+            temp[key].remove(data)
+        else:
+            print("{} not found".format(data))
     return temp
 
 
