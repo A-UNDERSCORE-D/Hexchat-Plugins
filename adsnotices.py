@@ -14,6 +14,7 @@ whoisregex = re.compile(r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)"
 snoteregex = r"\*\*\*\s(:?REMOTE)?{}?:.*?$"
 TIMEOUT = 180 
 users = {}
+children = []
 
 snotes = {
     "S-Kills": "KILL",
@@ -84,7 +85,7 @@ def sendnotif(msg, ntype):
         body = " ".join(smsg[2:])
 
     def checkblock(iblock):
-        return iblock.lower() == body.lower()
+        return iblock.lower() in body.lower()
 
     if ntype in blockvisual:
         for block in blockvisual[ntype]:
@@ -96,8 +97,14 @@ def sendnotif(msg, ntype):
             if checkblock(block):
                 return
 
-    subprocess.Popen(["notify-send", "-i", "hexchat", "--hint=int:transient:1",
-                      title.replace("\x02", ""), body.replace("\x02", "")])
+    children.append(subprocess.Popen(
+        ["notify-send", "-i", "hexchat", "--hint=int:transient:1",
+         title.replace("\x02", ""), body.replace("\x02", "")]))
+
+
+def procleanup(userdata):
+    children[:] = [c for c in children if c.poll() is None]
+    return True
 
 
 def addnet(net):
@@ -128,6 +135,7 @@ def addblockvisual(block):
         print("I require an argument")
         return
     blockvisual = appendpref("blockvisual", block, key=key)
+    # print("{phrase} added to {snote}".format(phrase=block, snote=key))
 
 
 def delblockvisual(block):
@@ -138,6 +146,15 @@ def delblockvisual(block):
         print("I require an argument")
         return
     blockvisual = removepref("blockvisual", block, key=key)
+    # print("{phrase} removed from {snote}".format(phrase=block, snote=key))
+
+
+def listblockvisual(*args, **kwargs):
+    print("Strings blocked in snotices:")
+    for ntype in blockvisual:
+        print(ntype, ";")
+        for block in blockvisual[ntype]:
+            print(" `", block)
 
 commands = {
     "addnet": addnet,
@@ -150,9 +167,7 @@ commands = {
 
     "addblockvisual": addblockvisual,
     "delblockvisual": delblockvisual,
-    "listblockvisual": lambda x: print(
-        "Strings that are blocked in visual snotes:", "\"{}".format(
-                                           "\", \"".join(blockvisual)) + "\"")
+    "listblockvisual": listblockvisual
 }
 
 
@@ -192,6 +207,7 @@ def appendpref(name, data, key=None):
             temp[key].append(data)
         else:
             temp[key] = [data]
+        print("{phrase} added to {snote}".format(phrase=data, snote=key))
     else:
         print("unknown data type")
     setpref(name, temp)
@@ -214,8 +230,10 @@ def removepref(name, data, key=None):
                 if not temp[key]:
                     del temp[key]
                 setpref(name, temp)
+                print("{phrase} removed from {snote}".format(phrase=data,
+                                                             snote=key))
             else:
-                print("{} not found".format(data))
+                print("{} not found in {}".format(data, key))
         else:
             print("{} not found".format(key))
     return temp
@@ -239,9 +257,13 @@ def printtocontext(name, msg):
 
 @hexchat.hook_unload
 def onunload(userdata):
+    for child in children:
+        if child.poll() is None:
+            child.kill()
     print(__module_name__, "plugin unloaded")
 
 hexchat.hook_print("Server Notice", onsnotice)
 hexchat.hook_command("SNOTE", oncmd, help="USAGE: /SNOTE ADD/DEL/LIST "
                                           "NET|VISUAL|BLOCKVISUAL")
+hexchat.hook_timer(15 * 1000, procleanup)
 print(__module_name__, "plugin loaded")
