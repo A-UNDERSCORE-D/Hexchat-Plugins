@@ -92,7 +92,7 @@ def sendnotif(msg, ntype):
             if checkblock(block):
                 return
 
-    elif "all" in blockvisual:
+    if "all" in blockvisual:
         for block in blockvisual["all"]:
             if checkblock(block):
                 return
@@ -160,6 +160,7 @@ commands = {
     "addnet": addnet,
     "delnet": delnet,
     "listnet": lambda x: print("networks:", ", ".join(allowednets)),
+
     "addvisual": addvisual,
     "delvisual": delvisual,
     "listvisual": lambda x: print("Snotes that are sent visually:",
@@ -248,11 +249,11 @@ blockvisual = getpref("blockvisual", {})
 
 
 def printtocontext(name, msg):
-    if hexchat.find_context(hexchat.get_info("network"), name):
-        hexchat.find_context(hexchat.get_info("network"), name).prnt(msg)
-    else:
+    context = hexchat.find_context(hexchat.get_info("network"), name)
+    if not context:
         hexchat.command("QUERY -nofocus {}".format(name))
-        hexchat.find_context(hexchat.get_info("network"), name).prnt(msg)
+        context = hexchat.find_context(hexchat.get_info("network"), name)
+    context.prnt(msg)
 
 
 @hexchat.hook_unload
