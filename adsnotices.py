@@ -1,8 +1,9 @@
-import hexchat
+import json
 import re
 import subprocess
 import time
-import json
+
+import hexchat
 
 __module_name__ = "adsnotices"
 __module_description__ = "Sorts inspircd snotices into different queries, " \
@@ -12,9 +13,21 @@ __module_version__ = "2.2"
 whoisregex = re.compile(r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)"
                         r"\s(did\sa\s/whois\son\syou)")
 snoteregex = r"\*\*\*\s(:?REMOTE)?{}?:.*?$"
-TIMEOUT = 180 
 users = {}
 children = []
+snote_timers = {}
+
+allowednets_DEFAULT = []
+sendvisual_DEFAULT = ['s-globops', 's-links', 's-announcements', 's-operov', 's-operlogs', 's-floods', 's-opers']
+blockvisual_DEFAULT = {}
+whois_timeout_DEFAULT = 180
+snote_timeout_DEFAULT = 1
+
+allowednets = allowednets_DEFAULT
+sendvisual = sendvisual_DEFAULT
+blockvisual = blockvisual_DEFAULT
+whois_timeout = whois_timeout_DEFAULT
+snote_timeout = snote_timeout_DEFAULT
 
 snotes = {
     "S-Kills": "KILL",
@@ -42,8 +55,18 @@ def onsnotice(word, word_eol, userdata):
         for mask in snotes:
             if re.match(snoteregex.format(snotes[mask]), notice):
                 printtocontext(">>{}<<".format(mask), notice)
-                if mask.lower() in sendvisual:
-                    sendnotif(notice, mask.lower())
+                lowermask = mask.lower()
+                if lowermask in sendvisual:
+                    send = False
+                    if lowermask in snote_timers and (time.time() - snote_timers[lowermask]) >= snote_timeout:
+                        send = True
+                        snote_timers[lowermask] = time.time()
+                    elif lowermask not in snote_timers:
+                        snote_timers[lowermask] = time.time()
+                        send = True
+                    if send:
+                        sendnotif(notice, lowermask)
+
                 eat = True
 
         whois = whoisregex.match(notice)
@@ -63,7 +86,7 @@ def sendwhoisnotice(msg):
 
 def counterwhois(nick):
     if nick in users:
-        if time.time() - users[nick] <= TIMEOUT:
+        if time.time() - users[nick] <= whois_timeout:
             users[nick] = time.time()
             return
     else:
@@ -109,44 +132,72 @@ def procleanup(userdata):
 
 def addnet(net):
     global allowednets
-    allowednets = appendpref("allowednetworks", net)
+    allowednets.append(net)
+    saveconfig()
 
 
 def delnet(net):
     global allowednets
-    allowednets = removepref("allowednetworks", net)
+    if net in allowednets:
+        allowednets.remove(net)
+        saveconfig()
+    else:
+        print("{} is not in the allowed network list".format(net))
 
 
 def addvisual(snotice):
     global sendvisual
-    sendvisual = appendpref("sendvisual", snotice)
+    sendvisual.append(snotice.lower())
+    saveconfig()
 
 
 def delvisual(snotice):
     global sendvisual
-    sendvisual = removepref("sendvisual", snotice)
+    snotice = snotice.lower()
+    if snotice in sendvisual:
+        sendvisual.remove(snotice)
+        saveconfig()
+    else:
+        print("{} is not in the list of visually send snotices".format(snotice))
 
 
 def addblockvisual(block):
     global blockvisual
     if len(block.split()) >= 2:
         key, block = block.split(None, 1)
+        key = key.lower()
+        if key in blockvisual:
+            if block in blockvisual[key]:
+                print("'{}' is already in {}'s block list", block, key)
+            else:
+                blockvisual[key].append(block)
+                saveconfig()
+                print("'{}' added to {}'s block list".format(block, key))
+        else:
+            blockvisual[key] = [block]
+            saveconfig()
+            print("'{}' added to {}'s block list".format(block, key))
     else:
         print("I require an argument")
         return
-    blockvisual = appendpref("blockvisual", block, key=key)
-    # print("{phrase} added to {snote}".format(phrase=block, snote=key))
 
 
 def delblockvisual(block):
     global blockvisual
     if len(block.split()) >= 2:
         key, block = block.split(None, 1)
+        key = key.lower()
+        if key in blockvisual:
+            blockvisual[key].remove(block)
+            if not blockvisual[key]:
+                del blockvisual[key]
+            saveconfig()
+            print("'{}' added to {}'s block list".format(key, block))
+        else:
+            print("{key} is not in the block visual list".format(key=key))
     else:
         print("I require an argument")
         return
-    blockvisual = removepref("blockvisual", block, key=key)
-    # print("{phrase} removed from {snote}".format(phrase=block, snote=key))
 
 
 def listblockvisual(*args, **kwargs):
@@ -156,6 +207,55 @@ def listblockvisual(*args, **kwargs):
         for block in blockvisual[ntype]:
             print(" `", block)
 
+
+def setwhoistimeout(timeout):
+    global whois_timeout
+    whois_timeout = int(timeout)
+    saveconfig()
+    print("whois timeout set to {}".format(whois_timeout))
+
+
+def setsnotetimeout(timeout):
+    global snote_timeout
+    snote_timeout = int(timeout)
+    saveconfig()
+    print("snote timeout set to {}".format(snote_timeout))
+
+
+def getconfig():
+    config = json.loads(hexchat.get_pluginpref(__module_name__ + "_config") or "[]")
+    global allowednets, sendvisual, blockvisual, whois_timeout, snote_timeout
+    if isinstance(config, dict):
+        allowednets = config.get("allowednets", allowednets_DEFAULT)
+        sendvisual = config.get("sendvisual", sendvisual_DEFAULT)
+        blockvisual = config.get("blockvisual", blockvisual_DEFAULT)
+        whois_timeout = config.get("whoistimeout", whois_timeout_DEFAULT)
+        snote_timeout = config.get("snotetimeout", snote_timeout_DEFAULT)
+    else:
+        saveconfig()
+
+
+def saveconfig():
+    config = {
+        "allowednets": allowednets,
+        "sendvisual": sendvisual,
+        "blockvisual": blockvisual,
+        "whoistimeout": whois_timeout,
+        "snotetimeout": snote_timeout
+    }
+    hexchat.set_pluginpref(__module_name__ + "_config", json.dumps(config))
+
+
+def debug(*args):
+    print("allowednets: {} type: {}".format(allowednets, type(allowednets)))
+    print("sendvisual: {} type: {}".format(sendvisual, type(sendvisual)))
+    print("blocksendvisual: {} type: {}".format(blockvisual, type(blockvisual)))
+    print("whoistimeout: {} type: {}".format(whois_timeout, type(whois_timeout)))
+    print("snotetimeout: {} type: {}".format(snote_timeout, type(snote_timeout)))
+    print("snote timers: {} type: {}".format(snote_timers, type(snote_timers)))
+    print("whois timers: {} type: {}".format(users, type(users)))
+
+
 commands = {
     "addnet": addnet,
     "delnet": delnet,
@@ -163,12 +263,16 @@ commands = {
 
     "addvisual": addvisual,
     "delvisual": delvisual,
-    "listvisual": lambda x: print("Snotes that are sent visually:",
-                                  ", ".join(sendvisual)),
+    "listvisual": lambda x: print("Snotes that are sent visually:", ", ".join(sendvisual)),
 
     "addblockvisual": addblockvisual,
     "delblockvisual": delblockvisual,
-    "listblockvisual": listblockvisual
+    "listblockvisual": listblockvisual,
+    "debug": debug,
+    "setwhoistimeout": setwhoistimeout,
+    "listwhoistimeout": lambda x: print("Whois timeout is: {}".format(whois_timeout)),
+    "setsnotetimeout": setsnotetimeout,
+    "listsnotetimeout": lambda x: print("Snote timeout is: {}".format(snote_timeout)),
 }
 
 
@@ -180,72 +284,6 @@ def oncmd(word, word_eol, userdata):
     else:
         hexchat.command("HELP SNOTE")
     return hexchat.EAT_ALL
-
-
-def getpref(name, default=None):
-    if default is None:
-        default = []
-    name = __module_name__ + "_" + name
-    temp = hexchat.get_pluginpref(name)
-    if not temp:
-        hexchat.set_pluginpref(name, json.dumps(default))
-    return json.loads(temp)
-
-
-def setpref(name, data):
-    name = __module_name__ + "_" + name
-    data = json.dumps(data)
-    hexchat.set_pluginpref(name, data)
-    return data
-
-
-def appendpref(name, data, key=None):
-    temp = getpref(name)
-    if isinstance(temp, list):
-        temp.append(data)
-    elif isinstance(temp, dict):
-        if key in temp:
-            temp[key].append(data)
-        else:
-            temp[key] = [data]
-        print("{phrase} added to {snote}".format(phrase=data, snote=key))
-    else:
-        print("unknown data type")
-    setpref(name, temp)
-    return temp
-
-
-def removepref(name, data, key=None):
-    temp = getpref(name)
-    if isinstance(temp, list):
-        if data in temp:
-            temp.remove(data)
-            setpref(name, temp)
-        else:
-            print("{} not found".format(data))
-
-    elif isinstance(temp, dict):
-        if key in temp:
-            if data in temp[key]:
-                temp[key].remove(data)
-                if not temp[key]:
-                    del temp[key]
-                setpref(name, temp)
-                print("{phrase} removed from {snote}".format(phrase=data,
-                                                             snote=key))
-            else:
-                print("{} not found in {}".format(data, key))
-        else:
-            print("{} not found".format(key))
-    return temp
-
-
-allowednets = getpref("allowednetworks")
-sendvisual = getpref("sendvisual",
-                     ['s-globops', 's-links', 's-announcements', 's-operov',
-                      's-operlogs', 's-floods', 's-opers'])
-
-blockvisual = getpref("blockvisual", {})
 
 
 def printtocontext(name, msg):
@@ -263,6 +301,8 @@ def onunload(userdata):
             child.kill()
     print(__module_name__, "plugin unloaded")
 
+
+getconfig()
 hexchat.hook_print("Server Notice", onsnotice)
 hexchat.hook_command("SNOTE", oncmd, help="USAGE: /SNOTE ADD/DEL/LIST "
                                           "NET|VISUAL|BLOCKVISUAL")
