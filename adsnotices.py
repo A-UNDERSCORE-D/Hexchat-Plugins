@@ -20,14 +20,17 @@ snote_timers = {}
 allowednets_DEFAULT = []
 sendvisual_DEFAULT = ['s-globops', 's-links', 's-announcements', 's-operov', 's-operlogs', 's-floods', 's-opers']
 blockvisual_DEFAULT = {}
-whois_timeout_DEFAULT = 180
-snote_timeout_DEFAULT = 1
+whois_timeout_DEFAULT = 180.0
+snote_timeout_DEFAULT = 1.0
+snote_specific_timeout_DEFAULT = {}
+
 
 allowednets = allowednets_DEFAULT
 sendvisual = sendvisual_DEFAULT
 blockvisual = blockvisual_DEFAULT
 whois_timeout = whois_timeout_DEFAULT
 snote_timeout = snote_timeout_DEFAULT
+snote_specific_timeout = snote_specific_timeout_DEFAULT
 
 snotes = {
     "S-Kills": "KILL",
@@ -57,14 +60,7 @@ def onsnotice(word, word_eol, userdata):
                 printtocontext(">>{}<<".format(mask), notice)
                 lowermask = mask.lower()
                 if lowermask in sendvisual:
-                    send = False
-                    if lowermask in snote_timers and (time.time() - snote_timers[lowermask]) >= snote_timeout:
-                        send = True
-                        snote_timers[lowermask] = time.time()
-                    elif lowermask not in snote_timers:
-                        snote_timers[lowermask] = time.time()
-                        send = True
-                    if send:
+                    if checktimout(lowermask):
                         sendnotif(notice, lowermask)
 
                 eat = True
@@ -76,6 +72,16 @@ def onsnotice(word, word_eol, userdata):
 
         if eat:
             return hexchat.EAT_ALL
+
+
+def checktimout(lowermask):
+    if lowermask in snote_timers and (time.time() - snote_timers[lowermask]) >= snote_specific_timeout.get(lowermask, snote_timeout):
+        snote_timers[lowermask] = time.time()
+        return True
+    elif lowermask not in snote_timers:
+        snote_timers[lowermask] = time.time()
+        return True
+    return False
 
 
 def sendwhoisnotice(msg):
@@ -210,27 +216,46 @@ def listblockvisual(*args, **kwargs):
 
 def setwhoistimeout(timeout):
     global whois_timeout
-    whois_timeout = int(timeout)
+    whois_timeout = float(timeout)
     saveconfig()
     print("whois timeout set to {}".format(whois_timeout))
 
 
 def setsnotetimeout(timeout):
     global snote_timeout
-    snote_timeout = int(timeout)
+    snote_timeout = float(timeout)
     saveconfig()
     print("snote timeout set to {}".format(snote_timeout))
 
 
+def addspecifictimeout(timeout):
+    timeout = timeout.lower()
+    split = timeout.split()
+    if len(split) >= 2:
+        snote_specific_timeout[split[0]] = float(split[1])
+        print("{}'s timeout set to {}".format(split[0], split[1]))
+        saveconfig()
+
+
+def delspecifictimeout(timeout):
+    timeout = timeout.lower()
+    split = timeout.split()
+    if split[0] in snote_specific_timeout:
+        del snote_specific_timeout[split[0]]
+        saveconfig()
+        print("{}'s specific timeout has been removed".format(split[0]))
+
+
 def getconfig():
     config = json.loads(hexchat.get_pluginpref(__module_name__ + "_config") or "[]")
-    global allowednets, sendvisual, blockvisual, whois_timeout, snote_timeout
+    global allowednets, sendvisual, blockvisual, whois_timeout, snote_timeout, snote_specific_timeout
     if isinstance(config, dict):
         allowednets = config.get("allowednets", allowednets_DEFAULT)
         sendvisual = config.get("sendvisual", sendvisual_DEFAULT)
         blockvisual = config.get("blockvisual", blockvisual_DEFAULT)
         whois_timeout = config.get("whoistimeout", whois_timeout_DEFAULT)
         snote_timeout = config.get("snotetimeout", snote_timeout_DEFAULT)
+        snote_specific_timeout = config.get("snotespecific", snote_specific_timeout_DEFAULT)
     else:
         saveconfig()
 
@@ -241,7 +266,8 @@ def saveconfig():
         "sendvisual": sendvisual,
         "blockvisual": blockvisual,
         "whoistimeout": whois_timeout,
-        "snotetimeout": snote_timeout
+        "snotetimeout": snote_timeout,
+        "snotespecific": snote_specific_timeout
     }
     hexchat.set_pluginpref(__module_name__ + "_config", json.dumps(config))
 
@@ -254,6 +280,7 @@ def debug(*args):
     print("snotetimeout: {} type: {}".format(snote_timeout, type(snote_timeout)))
     print("snote timers: {} type: {}".format(snote_timers, type(snote_timers)))
     print("whois timers: {} type: {}".format(users, type(users)))
+    print("specific timers: {} type {}".format(snote_specific_timeout, type(snote_specific_timeout)))
 
 
 commands = {
@@ -273,6 +300,8 @@ commands = {
     "listwhoistimeout": lambda x: print("Whois timeout is: {}".format(whois_timeout)),
     "setsnotetimeout": setsnotetimeout,
     "listsnotetimeout": lambda x: print("Snote timeout is: {}".format(snote_timeout)),
+    "setspecifictimeout": addspecifictimeout,
+    "delspecifictimeout": delspecifictimeout,
 }
 
 
