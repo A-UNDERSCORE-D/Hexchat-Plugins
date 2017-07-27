@@ -50,6 +50,9 @@ snotes = {
     "S-Debug": "DEBUG"
 }
 
+# TODO: Add a list of phrases to check on in any snote and forward them,
+# TODO: maybe set specific ones too? specific snote class: HILIGHT
+
 
 def onsnotice(word, word_eol, userdata):
     notice = word[0]
@@ -397,6 +400,6 @@ def onunload(userdata):
 
 getconfig()
 hexchat.hook_print("Server Notice", onsnotice)
-hexchat.hook_command("SNOTE", oncmd, help="USAGE: for usage, run snote help")
+hexchat.hook_command("SNOTE", oncmd, help="USAGE: for usage, run /snote help")
 hexchat.hook_timer(15 * 1000, procleanup)
 print(__module_name__, "plugin loaded")
