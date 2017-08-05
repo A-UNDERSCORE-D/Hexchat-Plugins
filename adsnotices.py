@@ -24,6 +24,7 @@ blockvisual_DEFAULT = {}
 whois_timeout_DEFAULT = 180.0
 snote_timeout_DEFAULT = 1.0
 snote_specific_timeout_DEFAULT = {}
+allowcounterwhois_DEFAULT = True
 
 allowednets = allowednets_DEFAULT
 sendvisual = sendvisual_DEFAULT
@@ -31,6 +32,7 @@ blockvisual = blockvisual_DEFAULT
 whois_timeout = whois_timeout_DEFAULT
 snote_timeout = snote_timeout_DEFAULT
 snote_specific_timeout = snote_specific_timeout_DEFAULT
+allowcounterwhois = allowcounterwhois_DEFAULT
 
 snotes = {
     "S-Kills": "KILL",
@@ -53,10 +55,14 @@ snotes = {
 # TODO: Add a list of phrases to check on in any snote and forward them,
 # TODO: maybe set specific ones too? specific snote class: HILIGHT
 
+# TODO: Instead of recompiling the regex each time, compile every one on load
+# TODO: Also, breaking out of the loop sounds like a good idea
+
 
 def onsnotice(word, word_eol, userdata):
     notice = word[0]
     eat = False
+    is_not_whois = False
     if hexchat.get_info("network").lower() in allowednets:
         for mask in snotes:
             if re.match(snoteregex.format(snotes[mask]), notice):
@@ -65,11 +71,14 @@ def onsnotice(word, word_eol, userdata):
                 if lowermask in sendvisual and checktimout(lowermask):
                     sendnotif(notice, lowermask)
                 eat = True
-
-        whois = whoisregex.match(notice)
-        if whois:
-            sendwhoisnotice(whois)
-            counterwhois(whois.group(1).split()[1])
+                is_not_whois = True
+                break
+        if not is_not_whois:
+            whois = whoisregex.match(notice)
+            if whois:
+                sendwhoisnotice(whois)
+                if allowcounterwhois:
+                    counterwhois(whois.group(1).split()[1])
 
         if eat:
             return hexchat.EAT_ALL
@@ -335,6 +344,19 @@ def debug():
     print("Commands: {}".format(commands))
 
 
+@command("counterwhois", "Yes or no", "Sets whether or not to whois anyone whoising you")
+def cmdallowcounterwhois(args):
+    if isinstance(args, str):
+        global allowcounterwhois
+        if args.lower() in ("yes", "y", "true"):
+            allowcounterwhois = True
+            print("Counterwhoises will now be performed")
+        if args.lower() in ("no", "n", "false"):
+            allowcounterwhois = False
+            print("Counterwhoises will no longer be performed")
+        saveconfig()
+
+
 def getconfig():
     config = json.loads(hexchat.get_pluginpref(__module_name__ + "_config") or "[]")
     global allowednets, sendvisual, blockvisual, whois_timeout, snote_timeout, snote_specific_timeout
@@ -368,7 +390,6 @@ def oncmd(word, word_eol, userdata):
             signature = inspect.signature(cmd[0])
             if len(signature.parameters) > 0:
                 if len(word) == 3:
-                    print("word is 3")
                     cmd[0](word[2])
                 elif len(word) > 3:
                     cmd[0](" ".join(word[2:]))
