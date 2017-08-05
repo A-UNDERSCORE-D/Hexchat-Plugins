@@ -35,21 +35,21 @@ snote_specific_timeout = snote_specific_timeout_DEFAULT
 allowcounterwhois = allowcounterwhois_DEFAULT
 
 snotes = {
-    "S-Kills": "KILL",
-    "S-Xlines": "XLINE",
-    "S-Opers": "OPER",
-    "S-Announcements": "ANNOUNCEMENT",
-    "S-Globops": "GLOBOPS",
-    "S-Operlogs": "OPERLOG",
-    "S-Joins": "(JOIN|PART)",
-    "S-Connects": "(CONNECT|QUIT)",
-    "S-Floods": "FLOOD",
-    "S-Nicks": "NICK",
-    "S-Chans": "CHANCREATE",
-    "S-Links": "LINK",
-    "S-Operov": "SNO-v",
-    "S-Stats": "STATS",
-    "S-Debug": "DEBUG"
+    "S-Kills": re.compile(snoteregex.format("KILL")),
+    "S-Xlines": re.compile(snoteregex.format("XLINE")),
+    "S-Opers": re.compile(snoteregex.format("OPER")),
+    "S-Announcements": re.compile(snoteregex.format("ANNOUNCEMENT")),
+    "S-Globops": re.compile(snoteregex.format("GLOBOPS")),
+    "S-Operlogs": re.compile(snoteregex.format("OPERLOG")),
+    "S-Joins": re.compile(snoteregex.format("(JOIN|PART)")),
+    "S-Connects": re.compile(snoteregex.format("(CONNECT|QUIT)")),
+    "S-Floods": re.compile(snoteregex.format("FLOOD")),
+    "S-Nicks": re.compile(snoteregex.format("NICK")),
+    "S-Chans": re.compile(snoteregex.format("CHANCREATE")),
+    "S-Links": re.compile(snoteregex.format("LINK")),
+    "S-Operov": re.compile(snoteregex.format("SNO-v")),
+    "S-Stats": re.compile(snoteregex.format("STATS")),
+    "S-Debug": re.compile(snoteregex.format("DEBUG"))
 }
 
 # TODO: Add a list of phrases to check on in any snote and forward them,
@@ -65,7 +65,7 @@ def onsnotice(word, word_eol, userdata):
     is_not_whois = False
     if hexchat.get_info("network").lower() in allowednets:
         for mask in snotes:
-            if re.match(snoteregex.format(snotes[mask]), notice):
+            if snotes[mask].match(notice):
                 printtocontext(">>{}<<".format(mask), notice)
                 lowermask = mask.lower()
                 if lowermask in sendvisual and checktimout(lowermask):
