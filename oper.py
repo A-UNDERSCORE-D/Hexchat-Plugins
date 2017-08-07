@@ -11,7 +11,8 @@ kills = [
     "Here, have my axe.",
     "Hold this for me?",
     "Hey! catch!",
-
+    "http://i.imgur.com/O3DHIA5.gif",
+    "http://i.imgur.com/A4XPmWT.gif",
 ]
 
 
