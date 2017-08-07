@@ -52,11 +52,9 @@ snotes = {
     "S-Debug": re.compile(snoteregex.format("DEBUG"))
 }
 
+
 # TODO: Add a list of phrases to check on in any snote and forward them,
 # TODO: maybe set specific ones too? specific snote class: HILIGHT
-
-# TODO: Instead of recompiling the regex each time, compile every one on load
-# TODO: Also, breaking out of the loop sounds like a good idea
 
 
 def onsnotice(word, word_eol, userdata):
@@ -162,7 +160,7 @@ def command(cmd, cmdargs="", cmdhelp=""):
 @command("addnet", "network name", "Adds a network to the list of networks where this script will function")
 def addnet(net):
     global allowednets
-    allowednets.append(net)
+    allowednets.append(net.lower())
     saveconfig()
 
 
@@ -170,7 +168,7 @@ def addnet(net):
 def delnet(net):
     global allowednets
     if net in allowednets:
-        allowednets.remove(net)
+        allowednets.remove(net.lower())
         saveconfig()
     else:
         print("{} is not in the allowed network list".format(net))
@@ -257,8 +255,8 @@ def listblockvisual():
             print(" `'{}'".format(block))
 
 
-@command("setwhoistimeout", "number",  "sets the global whois timeout. This is the minimum time between counterwhoises "
-                                       "for a given user in seconds (fractions of a second are supported)")
+@command("setwhoistimeout", "number", "sets the global whois timeout. This is the minimum time between counterwhoises "
+                                      "for a given user in seconds (fractions of a second are supported)")
 def setwhoistimeout(timeout):
     global whois_timeout
     whois_timeout = float(timeout)
@@ -321,7 +319,7 @@ def listspecifictimeout():
 def commandhelp():
     printfmt = "{cmd}\t {args:<15} | {desc:<50}"
     print("{cmd:}\t {args:^15} | {desc:^50}".format(cmd="\x02Command\x02", args="Args", desc="Description"))
-    print("-"*110)
+    print("-" * 110)
     for cmdname in commands:
         cmd = commands[cmdname]
         cmdargs = cmd[1] if cmd[1] else "None"
