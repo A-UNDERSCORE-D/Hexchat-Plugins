@@ -1,6 +1,6 @@
 import hexchat
 import random
-from pprint import pprint
+
 __module_name__ = "adoper"
 __module_description__ = "Aliases to OperServ commands that I use often"
 __module_version__ = "0.5"
@@ -17,7 +17,6 @@ kills_text = [
     "Here, I'm going to let you hold my axe for a second... oops, seems I dropped instead",
     "Here, I'm going to let you hold my axe for a second... oops, seems you are too weak to wield such things",
     "Here, I'm going to let you hold my axe for a second...",
-    ""
 ]
 
 kills_images = [
@@ -38,14 +37,10 @@ def kill(word, word_eol, userdata):
         )
     elif len(word) > 2:
         hexchat.command(
-            "msg OperServ KILL {nick} {reason} \"{reason2}\"".format(
-                nick=word[1], reason=word_eol[2], reason2=random.choice(kills))
+            "msg OperServ KILL {nick} {reason}".format(
+                nick=word[1], reason=word_eol[2])
         )
     return hexchat.EAT_ALL
-
-
-def printkills(word, word_eol, userdata):
-    pprint(kills)
 
 
 @hexchat.hook_unload
