@@ -11,7 +11,7 @@ kills_text = [
     "Here, have my axe.",
     "Hold this for me?",
     "Hey! catch!",
-    "Have You Really Been Far Even as Decided to Use Even Go Want to do Look More Like?",
+    "Have You Really Been So Far Even as Decided to Use Even Go Want to do Look More Like?",
     "/okill",
     "Here, I'm going to let you hold my axe for a second... oops, seems it was too powerful",
     "Here, I'm going to let you hold my axe for a second... oops, seems I dropped instead",
@@ -22,6 +22,7 @@ kills_text = [
 kills_images = [
     "http://i.imgur.com/O3DHIA5.gif",
     "http://i.imgur.com/A4XPmWT.gif",
+    "http://i.imgur.com/Mu3tJ6T.jpg",
 ]
 
 kills = kills_text * 2 + kills_images
@@ -48,6 +49,5 @@ def onunload(userdata):
     print(__module_name__, "plugin unloaded")
 
 hexchat.hook_command("okill", kill)
-hexchat.hook_command("printkills", printkills)
 
 print(__module_name__, "plugin loaded")
