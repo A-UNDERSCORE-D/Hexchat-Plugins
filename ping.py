@@ -1,6 +1,6 @@
 import hexchat
 __module_name__ = "adping"
-__module_version__ = "2.0"
+__module_version__ = "2.1"
 __module_description__ = "writes pings and notices to an additional channel"
 
 WINDOW_FMT = ">>{name}<<"
