@@ -22,6 +22,8 @@ end
 local function onPing()
   if (not isoff) and (os.time() - last) < 10 then
     count = count + 1
+  else
+    count = 0
   end
   if (not isoff) and (count > max) then
     hexchat.command("PINGSPAMOFF")
