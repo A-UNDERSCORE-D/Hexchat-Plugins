@@ -17,7 +17,8 @@ kills_text = [
     "Here, I'm going to let you hold my axe for a second... oops, seems I dropped instead",
     "Here, I'm going to let you hold my axe for a second... oops, seems you are too weak to wield such things",
     "Here, I'm going to let you hold my axe for a second...",
-    "You are the weakest link. Goodbye. ;)"
+    "You are the weakest link. Goodbye. ;)",
+    "Next time its Mr Sledgy the Network Banhammer"
 ]
 
 kills_images = [
