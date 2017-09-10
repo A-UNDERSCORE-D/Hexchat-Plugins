@@ -34,6 +34,10 @@ kills_images = [
 
 kills = kills_text * 2 + kills_images
 
+MENU_ITEMS = frozenset({
+    ("$NICK/Operator Actions/OS KILL", "OKILL %s")
+})
+
 
 def kill(word, word_eol, userdata):
     if len(word) < 2:
@@ -46,10 +50,27 @@ def kill(word, word_eol, userdata):
     return hexchat.EAT_ALL
 
 
+def masskill(word, word_eol, userdata):
+    for nick in word[1:]:
+        hexchat.command("OKILL {}".format(nick))
+
+
+def menu_items(add=True):
+    for name, cmd in MENU_ITEMS:
+        if add:
+            hexchat.command("MENU ADD \"{}\" \"{}\"".format(name, cmd))
+        else:
+            hexchat.command("MENU DEL \"{}\"".format(name))
+
+
 @hexchat.hook_unload
 def onunload(userdata):
+    menu_items(False)
     print(__module_name__, "plugin unloaded")
 
+
 hexchat.hook_command("okill", kill)
+hexchat.hook_command("omkill", masskill)
+menu_items()
 
 print(__module_name__, "plugin loaded")
