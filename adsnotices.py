@@ -5,6 +5,7 @@ import subprocess
 import time
 from collections import OrderedDict
 import hexchat
+from pathlib import Path
 
 __module_name__ = "adsnotices"
 __module_description__ = "Sorts inspircd snotices into different queries, " \
@@ -25,6 +26,7 @@ whois_timeout_DEFAULT = 180.0
 snote_timeout_DEFAULT = 1.0
 snote_specific_timeout_DEFAULT = {}
 allowcounterwhois_DEFAULT = True
+highlight_DEFAULT = []
 
 allowednets = allowednets_DEFAULT
 sendvisual = sendvisual_DEFAULT
@@ -33,6 +35,12 @@ whois_timeout = whois_timeout_DEFAULT
 snote_timeout = snote_timeout_DEFAULT
 snote_specific_timeout = snote_specific_timeout_DEFAULT
 allowcounterwhois = allowcounterwhois_DEFAULT
+highlight = highlight_DEFAULT
+config_version = 1
+
+conf_dir = Path(hexchat.get_info("configdir")).resolve() / "adconfig"
+conf_dir.mkdir(exist_ok=True)
+conf_file = conf_dir / "adsnotices.json"
 
 snotes = {
     "S-Kills": re.compile(snoteregex.format("KILL")),
@@ -59,8 +67,7 @@ snotes = {
 
 def onsnotice(word, word_eol, userdata):
     notice = word[0]
-    eat = False
-    is_not_whois = False
+    eat, is_not_whois, sent_to_ns = False, False, False
     if hexchat.get_info("network").lower() in allowednets:
         for mask in snotes:
             if snotes[mask].match(notice):
@@ -68,8 +75,11 @@ def onsnotice(word, word_eol, userdata):
                 lowermask = mask.lower()
                 if lowermask in sendvisual and checktimout(lowermask):
                     sendnotif(notice, lowermask)
+                    sent_to_ns = True
                 eat = True
                 is_not_whois = True
+                if not sent_to_ns and checkhighlight(notice):
+                    sendnotif(notice, "HL" + lowermask)
                 break
         if not is_not_whois:
             whois = whoisregex.match(notice)
@@ -80,6 +90,13 @@ def onsnotice(word, word_eol, userdata):
 
         if eat:
             return hexchat.EAT_ALL
+
+
+def checkhighlight(snote):
+    for phrase in highlight:
+        if phrase in snote:
+            return True
+    return False
 
 
 def checktimout(lowermask):
@@ -355,18 +372,72 @@ def cmdallowcounterwhois(args):
         saveconfig()
 
 
+@command("highlight", "phrase", "adds or removes a phrase to the snote highlight list")
+def cmdhighlight(args):
+    sargs = args.split(" ")
+    if len(sargs) >= 1:
+        cmd = sargs.pop(0)
+        has_phrase = False
+        phrase = None
+        if len(sargs) >= 1:
+            has_phrase = True
+            phrase = " ".join(sargs)
+
+        if cmd == "add" and has_phrase:
+            highlight.append(phrase)
+            saveconfig()
+            print("added '{}' to the highlight list".format(phrase))
+        elif cmd == "del" and has_phrase:
+            phrase = " ".join(sargs)
+            if phrase in highlight:
+                highlight.remove(phrase)
+                saveconfig()
+                print("removed '{}' from the highlight list".format(phrase))
+        elif cmd == "list":
+            print("Phrases in the highlight list")
+            for phrase in highlight:
+                print("`'{}'".format(phrase))
+    else:
+        print("You must provide a subcommand and phrase")
+
+
+@command("loadconf", "debug", "debug")
+def lconf():
+    getconfig()
+
+
 def getconfig():
-    config = json.loads(hexchat.get_pluginpref(__module_name__ + "_config") or "[]")
-    global allowednets, sendvisual, blockvisual, whois_timeout, snote_timeout, snote_specific_timeout
-    if isinstance(config, dict):
+    def loadconfig():
+        global allowednets, sendvisual, blockvisual, whois_timeout, snote_timeout, snote_specific_timeout, highlight
+        global config_version
         allowednets = config.get("allowednets", allowednets_DEFAULT)
         sendvisual = config.get("sendvisual", sendvisual_DEFAULT)
         blockvisual = config.get("blockvisual", blockvisual_DEFAULT)
         whois_timeout = config.get("whoistimeout", whois_timeout_DEFAULT)
         snote_timeout = config.get("snotetimeout", snote_timeout_DEFAULT)
         snote_specific_timeout = config.get("snotespecific", snote_specific_timeout_DEFAULT)
-    else:
-        saveconfig()
+        highlight = config.get("highlight", highlight_DEFAULT)
+        config_version = config.get("conf_version", highlight_DEFAULT)
+
+    if not conf_file.exists():
+        ppref = hexchat.get_pluginpref(__module_name__ + "_config") or "[]"
+        if ppref is not None:
+            config = None
+            try:
+                config = json.loads(ppref)
+            except (NameError, json.decoder.JSONDecodeError):
+                print("An error occured while loading the adsnotices old config style. a default config will now be "
+                      "loaded and saved using the new config system, your old config will now be printed to the screen "
+                      "and removed.")
+                print(ppref)
+
+            if isinstance(config, dict):
+                loadconfig()
+        migrateconfig()
+
+    with conf_file.open() as f:
+        config = json.load(f)
+        loadconfig()
 
 
 def saveconfig():
@@ -376,9 +447,24 @@ def saveconfig():
         "blockvisual": blockvisual,
         "whoistimeout": whois_timeout,
         "snotetimeout": snote_timeout,
-        "snotespecific": snote_specific_timeout
+        "snotespecific": snote_specific_timeout,
+        "highlight": highlight,
+        "conf_version": config_version
     }
-    hexchat.set_pluginpref(__module_name__ + "_config", json.dumps(config))
+
+    with conf_file.open(mode="w") as f:
+        json.dump(config, f, indent=2)
+
+    # TODO: Remove this
+    # hexchat.set_pluginpref(__module_name__ + "_config", json.dumps(config))
+
+
+def migrateconfig(del_old=True):
+    saveconfig()
+    if del_old:
+        if not hexchat.del_pluginpref(__module_name__ + "_config"):
+            print("An error occured while removing the old pluginpref")
+    print("Migration complete")
 
 
 def oncmd(word, word_eol, userdata):
