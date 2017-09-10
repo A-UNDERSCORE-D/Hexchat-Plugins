@@ -347,16 +347,22 @@ def commandhelp():
 
 
 @command("debug", cmdhelp="debug command, lists a few variables and their types")
-def debug():
-    print("allowednets: {} type: {}".format(allowednets, type(allowednets)))
-    print("sendvisual: {} type: {}".format(sendvisual, type(sendvisual)))
-    print("blocksendvisual: {} type: {}".format(blockvisual, type(blockvisual)))
-    print("whoistimeout: {} type: {}".format(whois_timeout, type(whois_timeout)))
-    print("snotetimeout: {} type: {}".format(snote_timeout, type(snote_timeout)))
-    print("snote timers: {} type: {}".format(snote_timers, type(snote_timers)))
-    print("whois timers: {} type: {}".format(users, type(users)))
-    print("specific timers: {} type {}".format(snote_specific_timeout, type(snote_specific_timeout)))
-    print("Commands: {}".format(commands))
+def debug(args):
+    def printconf():
+        print("allowednets: {} type: {}".format(allowednets, type(allowednets)))
+        print("sendvisual: {} type: {}".format(sendvisual, type(sendvisual)))
+        print("blocksendvisual: {} type: {}".format(blockvisual, type(blockvisual)))
+        print("whoistimeout: {} type: {}".format(whois_timeout, type(whois_timeout)))
+        print("snotetimeout: {} type: {}".format(snote_timeout, type(snote_timeout)))
+        print("snote timers: {} type: {}".format(snote_timers, type(snote_timers)))
+        print("whois timers: {} type: {}".format(users, type(users)))
+        print("specific timers: {} type {}".format(snote_specific_timeout, type(snote_specific_timeout)))
+        print("config version: {}".format(config_version))
+    if "all" in args:
+        printconf()
+        print("Commands: {}".format(commands))
+    if "conf" in args:
+        printconf()
 
 
 @command("counterwhois", "Yes or no", "Sets whether or not to whois anyone whoising you")
@@ -417,7 +423,7 @@ def getconfig():
         snote_timeout = config.get("snotetimeout", snote_timeout_DEFAULT)
         snote_specific_timeout = config.get("snotespecific", snote_specific_timeout_DEFAULT)
         highlight = config.get("highlight", highlight_DEFAULT)
-        config_version = config.get("conf_version", highlight_DEFAULT)
+        config_version = config.get("conf_version", 1)
 
     if not conf_file.exists():
         ppref = hexchat.get_pluginpref(__module_name__ + "_config") or "[]"
