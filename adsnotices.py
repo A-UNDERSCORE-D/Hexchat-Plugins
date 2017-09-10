@@ -418,6 +418,7 @@ def cmdhighlight(args):
                 highlight.remove(phrase)
                 saveconfig()
                 print("removed '{}' from the highlight list".format(phrase))
+            print("'{}' not found in the highlight list".format(phrase))
         elif cmd == "list":
             print("Phrases in the highlight list")
             for phrase in highlight:
@@ -492,12 +493,14 @@ def migrateconfig(del_old=True):
 def oncmd(word, word_eol, userdata):
     if len(word) >= 2:
         cmd = commands.get(word[1].lower())
-        if cmd[0]:
+        if cmd and cmd[0]:
             signature = inspect.signature(cmd[0])
             if len(signature.parameters) > 0:
                 cmd[0](" ".join(word[2:]))
             else:
                 cmd[0]()
+        else:
+            print("That is not a valid command, run '/SNOTE help' for information on syntax")
     else:
         hexchat.command("HELP SNOTE")
     return hexchat.EAT_HEXCHAT
