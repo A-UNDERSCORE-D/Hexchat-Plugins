@@ -8,12 +8,10 @@ import hexchat
 from pathlib import Path
 
 __module_name__ = "adsnotices"
-__module_description__ = "Sorts inspircd snotices into different queries, " \
-                         "and sends specific ones to notify-send"
-__module_version__ = "2.2"
+__module_description__ = "Sorts inspircd snotices into different queries, and sends specific ones to notify-send"
+__module_version__ = "2.3"
 
-whoisregex = re.compile(r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)"
-                        r"\s(did\sa\s/whois\son\syou)")
+whoisregex = re.compile(r"(\*\*\*\s(?:[^\s]+))\s\([^@]+@[^)]+\)\s(did\sa\s/whois\son\syou)")
 snoteregex = r"\*\*\*\s(:?REMOTE)?{}?:.*?$"
 users = {}
 children = []
