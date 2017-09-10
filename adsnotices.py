@@ -181,162 +181,176 @@ def command(cmd, cmdargs="", cmdhelp=""):
     return _decorate
 
 
-@command("addnet", "network name", "Adds a network to the list of networks where this script will function")
-def addnet(net):
+@command("net", "[add|remove|list] network name",
+         "Adds a network to the list of networks where this script will function")
+def net(arg):
+    args = arg.split()
     global allowednets
-    allowednets.append(net.lower())
-    saveconfig()
+    if args[0] == "add":
+        if len(args) > 1:
+            allowednets.append(args[1].lower())
+            saveconfig()
+        else:
+            "I require an argument"
 
+    elif args[0] == "del":
+        if len(args) > 1:
+            if args[1] in allowednets:
+                allowednets.remove(args[1].lower())
+                saveconfig()
+            else:
+                print("{} is not in the allowed network list".format(args[1]))
+        else:
+            print("I require an argument")
 
-@command("delnet", "network name", "Removes a network from the list of networks where this script will function")
-def delnet(net):
-    global allowednets
-    if net in allowednets:
-        allowednets.remove(net.lower())
-        saveconfig()
+    elif args[0] == "list":
+        print("networks:", ", ".join(allowednets))
     else:
-        print("{} is not in the allowed network list".format(net))
+        print("unknown subcommand for net")
 
 
-@command("listnet", cmdhelp="Lists the networks where this script will function")
-def listnet():
-    print("networks:", ", ".join(allowednets))
-
-
-@command("addvisual", "snote", "Adds an snotice to the list of snotes that are sent to notify-send")
-def addvisual(snotice):
+@command("visual", "[add|list|del] [snote]", "Adds an snotice to the list of snotes that are sent to notify-send")
+def visual(arg):
+    args = arg.split()
+    cmd = args.pop(0).lower()
+    snotice = " ".join(args)
     global sendvisual
-    sendvisual.append(snotice.lower())
-    saveconfig()
-
-
-@command("delvisual", "snote", "Removes an snote from the list of snotes that are sent to notify send")
-def delvisual(snotice):
-    global sendvisual
-    snotice = snotice.lower()
-    if snotice in sendvisual:
-        sendvisual.remove(snotice)
-        saveconfig()
+    if cmd == "add":
+        if snotice:
+            sendvisual.append(snotice.lower())
+            saveconfig()
+            print("'{}' added to list".format(snotice))
+        else:
+            print("I require an argument")
+    elif cmd == "del":
+        if snotice:
+            if snotice in sendvisual:
+                sendvisual.remove(snotice)
+                saveconfig()
+                print("'{}' removed from list".format(snotice))
+            else:
+                print("{} is not in the list of visually send snotices".format(snotice))
+        else:
+            print("I require an argument")
+    elif cmd == "list":
+        print("Snotes that are sent visually:", ", ".join(sendvisual))
     else:
-        print("{} is not in the list of visually send snotices".format(snotice))
+        print("unknown subcommand for visual")
 
 
-@command("listvisual", cmdhelp="Lists the snotees that are sent to notify-send")
-def listvisual():
-    print("Snotes that are sent visually:", ", ".join(sendvisual))
-
-
-@command("addblockvisual", "snote, phrase",
+@command("blockvisual", "snote, phrase",
          "Adds a phrase to the list of phrases that block a snote from being sent to notify-send. "
          "You can use 'all' as the snote to check all snotices for a given phrase.")
-def addblockvisual(block):
+def cmdblockvisual(arg):
+    args = arg.split()
+    cmd = args.pop(0).lower()
+    block = " ".join(args)
     global blockvisual
-    if len(block.split()) >= 2:
-        key, block = block.split(None, 1)
-        key = key.lower()
-        if key in blockvisual:
-            if block in blockvisual[key]:
-                print("'{}' is already in {}'s block list", block, key)
+    if cmd == "add":
+        if len(block.split()) >= 2:
+            key, block = block.split(None, 1)
+            key = key.lower()
+            if key in blockvisual:
+                if block in blockvisual[key]:
+                    print("'{}' is already in {}'s block list", block, key)
+                else:
+                    blockvisual[key].append(block)
+                    saveconfig()
+                    print("'{}' added to {}'s block list".format(block, key))
             else:
-                blockvisual[key].append(block)
+                blockvisual[key] = [block]
                 saveconfig()
                 print("'{}' added to {}'s block list".format(block, key))
         else:
-            blockvisual[key] = [block]
-            saveconfig()
-            print("'{}' added to {}'s block list".format(block, key))
-    else:
-        print("I require an argument")
-        return
-
-
-@command("delblockvisual", "snote, phrase",
-         "Removes a phrase from the list of phrases that stop snotices from being sent to notify-send")
-def delblockvisual(block):
-    global blockvisual
-    if len(block.split()) >= 2:
-        key, block = block.split(None, 1)
-        key = key.lower()
-        if key in blockvisual:
-            blockvisual[key].remove(block)
-            if not blockvisual[key]:
-                del blockvisual[key]
-            saveconfig()
-            print("'{}' removed from {}'s block list".format(key, block))
+            print("I require an argument")
+    if cmd == "del":
+        if len(block.split()) >= 2:
+            key, block = block.split(None, 1)
+            key = key.lower()
+            if key in blockvisual:
+                blockvisual[key].remove(block)
+                if not blockvisual[key]:
+                    del blockvisual[key]
+                saveconfig()
+                print("'{}' removed from {}'s block list".format(key, block))
+            else:
+                print("{key} is not in the block visual list".format(key=key))
         else:
-            print("{key} is not in the block visual list".format(key=key))
-    else:
-        print("I require an argument")
-        return
+            print("I require an argument")
+
+    if cmd == "list":
+        for ntype in blockvisual:
+            print(ntype + ";")
+            for block in blockvisual[ntype]:
+                print(" `'{}'".format(block))
 
 
-@command("listblockvisual", cmdhelp="Lists phrases that are blocked in snotices sent to notify-send")
-def listblockvisual():
-    print("Strings blocked in snotices:")
-    for ntype in blockvisual:
-        print(ntype + ";")
-        for block in blockvisual[ntype]:
-            print(" `'{}'".format(block))
+@command("whoistimeout", "number", "sets the global whois timeout. This is the minimum time between counterwhoises "
+                                   "for a given user in seconds (fractions of a second are supported)")
+def cmdwhoistimeout(arg):
+    args = arg.split()
+    cmd = args.pop(0)
+    if cmd == "set":
+        if len(args) > 0:
+            global whois_timeout
+            whois_timeout = float(args[0])
+            saveconfig()
+            print("whois timeout set to {}".format(whois_timeout))
+        else:
+            print("I need an argument")
+
+    elif cmd in ("get", "list"):
+        print("Whois timeout is: {}".format(whois_timeout))
 
 
-@command("setwhoistimeout", "number", "sets the global whois timeout. This is the minimum time between counterwhoises "
-                                      "for a given user in seconds (fractions of a second are supported)")
-def setwhoistimeout(timeout):
-    global whois_timeout
-    whois_timeout = float(timeout)
-    saveconfig()
-    print("whois timeout set to {}".format(whois_timeout))
-
-
-@command("listwhoistimeout", cmdhelp="Prints the global whois timeout")
-def listwhoistimeout():
-    print("Whois timeout is: {}".format(whois_timeout))
-
-
-@command("setsnotetimeout", "number",
+@command("snotetimeout", "number",
          "Sets the global snotice timeout. This sets the minimum time between calls of notify-send in seconds "
          "(fractions of a second are supported)")
-def setsnotetimeout(timeout):
-    global snote_timeout
-    snote_timeout = float(timeout)
-    saveconfig()
-    print("snote timeout set to {}".format(snote_timeout))
+def cmdsnotetimeout(arg):
+    args = arg.split()
+    cmd = args.pop(0)
+    if cmd == "set":
+        if len(args) > 0:
+            global snote_timeout
+            snote_timeout = float(args[0])
+            saveconfig()
+            print("snote timeout set to {}".format(snote_timeout))
+        else:
+            print("I need an argument")
+
+    if cmd in ("get", "list"):
+        print("Snote timeout is: {}".format(snote_timeout))
 
 
-@command("listsnotetimeout", cmdhelp="Lists the global snotice timeout")
-def listsnotetimeout():
-    print("Snote timeout is: {}".format(snote_timeout))
-
-
-@command("addsecifictimeout", "snote, timeout",
+@command("specifictimeout", "snote, timeout",
          "Adds overriding timeouts for a given snotice, these are used instead of the global one")
-def addspecifictimeout(timeout):
-    timeout = timeout.lower()
-    split = timeout.split()
-    if len(split) >= 2:
-        snote_specific_timeout[split[0]] = float(split[1])
-        print("{}'s timeout set to {}".format(split[0], split[1]))
-        saveconfig()
-
-
-@command("delspecifictimeout", "snote, timeout", "Removes a set specific snote timeout")
-def delspecifictimeout(timeout):
-    timeout = timeout.lower()
-    split = timeout.split()
-    if split[0] in snote_specific_timeout:
-        del snote_specific_timeout[split[0]]
-        saveconfig()
-        print("{}'s specific timeout has been removed".format(split[0]))
-
-
-@command("listspecifictimeout", cmdhelp="lists the specific timeouts set for snotices")
-def listspecifictimeout():
-    if snote_specific_timeout:
-        print("Specific Snote Timeouts are as follows:")
-        for k, v in snote_specific_timeout.items():
-            print(k + ":", v)
-    else:
-        print("You have set no specific snote timeouts")
+def specifictimeout(arg):
+    args = arg.split()
+    cmd = args.pop(0)
+    if cmd == "set":
+        if len(args) > 1:
+            timeout = " ".join(args).lower()
+            split = timeout.split()
+            snote_specific_timeout[split[0]] = float(split[1])
+            print("{}'s timeout set to {}".format(split[0], split[1]))
+            saveconfig()
+        else:
+            print("I need an argument")
+    elif cmd == "del":
+        if len(args) > 1:
+            timeout = " ".join(args).lower()
+            split = timeout.split()
+            if split[0] in snote_specific_timeout:
+                del snote_specific_timeout[split[0]]
+                saveconfig()
+                print("{}'s specific timeout has been removed".format(split[0]))
+    elif cmd in ("get", "list"):
+        if snote_specific_timeout:
+            print("Specific Snote Timeouts are as follows:")
+            for k, v in snote_specific_timeout.items():
+                print(k + ":", v)
+        else:
+            print("You have set no specific snote timeouts")
 
 
 @command("help", cmdhelp="Shows help")
@@ -468,9 +482,6 @@ def saveconfig():
     with conf_file.open(mode="w") as f:
         json.dump(config, f, indent=2)
 
-    # TODO: Remove this
-    # hexchat.set_pluginpref(__module_name__ + "_config", json.dumps(config))
-
 
 def migrateconfig(del_old=True):
     saveconfig()
@@ -486,13 +497,7 @@ def oncmd(word, word_eol, userdata):
         if cmd[0]:
             signature = inspect.signature(cmd[0])
             if len(signature.parameters) > 0:
-                if len(word) == 3:
-                    cmd[0](word[2])
-                elif len(word) > 3:
-                    cmd[0](" ".join(word[2:]))
-                else:
-                    print("not enough args")
-
+                cmd[0](" ".join(word[2:]))
             else:
                 cmd[0]()
     else:
