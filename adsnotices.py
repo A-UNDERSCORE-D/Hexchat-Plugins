@@ -61,10 +61,6 @@ snotes = {
 }
 
 
-# TODO: Add a list of phrases to check on in any snote and forward them,
-# TODO: maybe set specific ones too? specific snote class: HILIGHT
-
-
 def onsnotice(word, word_eol, userdata):
     notice = word[0]
     eat, is_not_whois, sent_to_ns = False, False, False
@@ -79,7 +75,8 @@ def onsnotice(word, word_eol, userdata):
                 eat = True
                 is_not_whois = True
                 if not sent_to_ns and checkhighlight(notice):
-                    sendnotif(notice, "HL" + lowermask)
+                    sendnotif(notice, "HL")
+                    sendhighlightnotice(notice)
                 break
         if not is_not_whois:
             whois = whoisregex.match(notice)
@@ -93,8 +90,9 @@ def onsnotice(word, word_eol, userdata):
 
 
 def checkhighlight(snote):
+    to_check = snote.lower()
     for phrase in highlight:
-        if phrase in snote:
+        if phrase.lower() in to_check:
             return True
     return False
 
@@ -115,6 +113,11 @@ def sendwhoisnotice(msg):
                                                                              nmsg=" ".join(msg.groups())))
 
 
+def sendhighlightnotice(msg):
+    hexchat.command("RECV :highlight!hl@hl NOTICE {mynick} :{nmsg}".format(mynick=hexchat.get_info("nick"),
+                                                                           nmsg=msg))
+
+
 def counterwhois(nick):
     if nick in users:
         if time.time() - users[nick] <= whois_timeout:
@@ -127,6 +130,9 @@ def counterwhois(nick):
 
 def sendnotif(msg, ntype):
     smsg = msg.split()
+    hl = False
+    if ntype == "HL":
+        hl = True
 
     if "REMOTE" in msg:
         title = " ".join(smsg[1:4])
@@ -141,16 +147,17 @@ def sendnotif(msg, ntype):
     def checkblock(iblock):
         return iblock.lower() in body.lower()
 
-    if ntype in blockvisual:
+    if ntype in blockvisual and not hl:
         for block in blockvisual[ntype]:
             if checkblock(block):
                 return
 
-    if "all" in blockvisual:
+    if "all" in blockvisual and not hl:
         for block in blockvisual["all"]:
             if checkblock(block):
                 return
-
+    if hl:
+        title = "HIGHLIGHT: " + title
     children.append(subprocess.Popen(
         ["notify-send", "-i", "hexchat", "--hint=int:transient:1",
          title.replace("\x02", ""), body.replace("\x02", "")]))
