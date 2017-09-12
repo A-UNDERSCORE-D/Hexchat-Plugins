@@ -515,11 +515,19 @@ def printtocontext(name, msg):
     context.prnt(msg)
 
 
+def menu_items(add=True):
+    if add:
+        hexchat.command("MENU ADD \"$NICK/Watch\" \"SNOTE highlight add %s\"")
+    else:
+        hexchat.command("MENU DEL \"$NICK/Watch\"")
+
+
 @hexchat.hook_unload
 def onunload(userdata):
     for child in children:
         if child.poll() is None:
             child.kill()
+    menu_items(False)
     print(__module_name__, "plugin unloaded")
 
 
@@ -527,4 +535,6 @@ getconfig()
 hexchat.hook_print("Server Notice", onsnotice)
 hexchat.hook_command("SNOTE", oncmd, help="USAGE: for usage, run /snote help")
 hexchat.hook_timer(15 * 1000, procleanup)
+menu_items()
+
 print(__module_name__, "plugin loaded")
