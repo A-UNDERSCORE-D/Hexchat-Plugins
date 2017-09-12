@@ -418,7 +418,8 @@ def cmdhighlight(args):
                 highlight.remove(phrase)
                 saveconfig()
                 print("removed '{}' from the highlight list".format(phrase))
-            print("'{}' not found in the highlight list".format(phrase))
+            else:
+                print("'{}' not found in the highlight list".format(phrase))
         elif cmd == "list":
             print("Phrases in the highlight list")
             for phrase in highlight:
