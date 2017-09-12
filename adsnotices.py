@@ -72,8 +72,7 @@ def onsnotice(word, word_eol, userdata):
                     sent_to_ns = True
                 eat = True
                 is_not_whois = True
-                if not sent_to_ns and checkhighlight(notice):
-                    sendnotif(notice, "HL")
+                if checkhighlight(notice):
                     sendhighlightnotice(notice)
                 break
         if not is_not_whois:
@@ -128,10 +127,6 @@ def counterwhois(nick):
 
 def sendnotif(msg, ntype):
     smsg = msg.split()
-    hl = False
-    if ntype == "HL":
-        hl = True
-
     if "REMOTE" in msg:
         title = " ".join(smsg[1:4])
         body = " ".join(smsg[4:])
@@ -145,17 +140,15 @@ def sendnotif(msg, ntype):
     def checkblock(iblock):
         return iblock.lower() in body.lower()
 
-    if ntype in blockvisual and not hl:
+    if ntype in blockvisual:
         for block in blockvisual[ntype]:
             if checkblock(block):
                 return
 
-    if "all" in blockvisual and not hl:
+    if "all" in blockvisual:
         for block in blockvisual["all"]:
             if checkblock(block):
                 return
-    if hl:
-        title = "HIGHLIGHT: " + title
     children.append(subprocess.Popen(
         ["notify-send", "-i", "hexchat", "--hint=int:transient:1",
          title.replace("\x02", ""), body.replace("\x02", "")]))
