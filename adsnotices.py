@@ -417,12 +417,13 @@ def cmdhighlight(args):
                 print("removed '{}' from the highlight list".format(phrase))
             else:
                 print("'{}' not found in the highlight list".format(phrase))
-        elif cmd == "list":
+        elif cmd in ("list", ""):
             print("Phrases in the highlight list")
             for phrase in highlight:
                 print("`'{}'".format(phrase))
+
         # assume I want to add one.
-        else:
+        elif args != "":
             add(args)
 
     else:
