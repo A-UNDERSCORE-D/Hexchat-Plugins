@@ -269,7 +269,7 @@ def cmdblockvisual(arg):
         else:
             print("I require an argument")
 
-    if cmd == "list":
+    else:
         for ntype in blockvisual:
             print(ntype + ";")
             for block in blockvisual[ntype]:
@@ -290,7 +290,7 @@ def cmdwhoistimeout(arg):
         else:
             print("I need an argument")
 
-    elif cmd in ("get", "list"):
+    else:
         print("Whois timeout is: {}".format(whois_timeout))
 
 
@@ -309,7 +309,7 @@ def cmdsnotetimeout(arg):
         else:
             print("I need an argument")
 
-    if cmd in ("get", "list"):
+    else:
         print("Snote timeout is: {}".format(snote_timeout))
 
 
@@ -335,7 +335,7 @@ def specifictimeout(arg):
                 del snote_specific_timeout[split[0]]
                 saveconfig()
                 print("{}'s specific timeout has been removed".format(split[0]))
-    elif cmd in ("get", "list"):
+    else:
         if snote_specific_timeout:
             print("Specific Snote Timeouts are as follows:")
             for k, v in snote_specific_timeout.items():
@@ -397,14 +397,18 @@ def cmdhighlight(args):
         cmd = sargs.pop(0)
         has_phrase = False
         phrase = None
+
+        def add(ph):
+            highlight.append(ph)
+            saveconfig()
+            print("added '{}' to the highlight list".format(ph))
+
         if len(sargs) >= 1:
             has_phrase = True
             phrase = " ".join(sargs)
 
         if cmd == "add" and has_phrase:
-            highlight.append(phrase)
-            saveconfig()
-            print("added '{}' to the highlight list".format(phrase))
+            add(phrase)
         elif cmd == "del" and has_phrase:
             phrase = " ".join(sargs)
             if phrase in highlight:
@@ -417,6 +421,10 @@ def cmdhighlight(args):
             print("Phrases in the highlight list")
             for phrase in highlight:
                 print("`'{}'".format(phrase))
+        # assume I want to add one.
+        else:
+            add(args)
+
     else:
         print("You must provide a subcommand and phrase")
 
