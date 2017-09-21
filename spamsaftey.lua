@@ -6,12 +6,13 @@ hexchat.register(plugin_name, plugin_version, plugin_description)
 
 local last = os.time()
 local count = 0
-local max = 20
+local max = 30
 local isoff = false
 local wait = (1000 * 60) * 1 -- One minute
 local timer = 0
 
 local function timercb()
+  hexchat.find_context(hexchat.get_info("network"), nil):set()
   hexchat.command("PINGSPAMON")
   print("Timer expired or was manually removed, restoring standard behaviour")
   count = 0
@@ -26,6 +27,7 @@ local function onPing()
     count = 0
   end
   if (not isoff) and (count > max) then
+    hexchat.find_context(hexchat.get_info("network"), nil):set()
     hexchat.command("PINGSPAMOFF")
     print("You are being ping spammed. in order to prevent client lag ping sounds and notifications have been disabled.")
     timer = hexchat.hook_timer(wait, timercb)
