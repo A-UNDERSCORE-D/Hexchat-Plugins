@@ -132,3 +132,4 @@ ENV/
 
 # Rope project settings
 .ropeproject
+*.pyi
