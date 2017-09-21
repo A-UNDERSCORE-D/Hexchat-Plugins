@@ -399,9 +399,26 @@ def cmdhighlight(args):
         phrase = None
 
         def add(ph):
+            if ph in highlight:
+                print("'{}' already in highlight list".format(ph))
+                return
             highlight.append(ph)
             saveconfig()
             print("added '{}' to the highlight list".format(ph))
+
+        def delp(ph):
+            if ph in highlight:
+                highlight.remove(ph)
+                saveconfig()
+                print("removed '{}' from the highlight list".format(ph))
+            else:
+                print("'{}' not found in the highlight list".format(ph))
+
+        def addordel(ph):
+            if ph in highlight:
+                delp(ph)
+            else:
+                add(ph)
 
         if len(sargs) >= 1:
             has_phrase = True
@@ -410,24 +427,20 @@ def cmdhighlight(args):
         if cmd == "add" and has_phrase:
             add(phrase)
         elif cmd == "del" and has_phrase:
-            phrase = " ".join(sargs)
-            if phrase in highlight:
-                highlight.remove(phrase)
-                saveconfig()
-                print("removed '{}' from the highlight list".format(phrase))
-            else:
-                print("'{}' not found in the highlight list".format(phrase))
+            delp(" ".join(sargs))
         elif cmd in ("list", ""):
             print("Phrases in the highlight list")
             for phrase in highlight:
                 print("`'{}'".format(phrase))
+        elif cmd == "addordel" and has_phrase:
+            addordel(phrase)
 
         # assume I want to add one.
         elif args != "":
-            add(args)
+            addordel(args)
 
     else:
-        print("You must provide a subcommand and phrase")
+        print("You must provide either a subcommand and phrase, or a phrase to toggle in the list.")
 
 
 @command("loadconf", "debug", "debug")
@@ -519,7 +532,7 @@ def printtocontext(name, msg):
 
 def menu_items(add=True):
     if add:
-        hexchat.command("MENU ADD \"$NICK/Watch\" \"SNOTE highlight add %s\"")
+        hexchat.command("MENU ADD \"$NICK/Watch\" \"SNOTE highlight addordel %s\"")
     else:
         hexchat.command("MENU DEL \"$NICK/Watch\"")
 
