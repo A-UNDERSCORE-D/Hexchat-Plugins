@@ -220,7 +220,7 @@ def visual(arg):
                 saveconfig()
                 print("'{}' removed from list".format(snotice))
             else:
-                print("{} is not in the list of visually send snotices".format(snotice))
+                print("{} is not in the list of visually sent snotices".format(snotice))
         else:
             print("I require an argument")
     elif cmd == "list":
