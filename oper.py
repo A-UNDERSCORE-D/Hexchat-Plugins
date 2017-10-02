@@ -1,5 +1,6 @@
 import hexchat
 import random
+import re
 
 __module_name__ = "adoper"
 __module_description__ = "Aliases to OperServ commands that I use often"
@@ -50,6 +51,38 @@ def kill(word, word_eol, userdata):
     return hexchat.EAT_ALL
 
 
+EMAIL_PROVIDERS = {
+    "gmail.com": "+"
+}
+
+
+def email_cleanup(email, sep="+"):
+    if sep == "":
+        return email
+    email_part = email.partition("@")
+    email_acc = re.escape(email_part[0])
+    email_domain = re.escape(email_part[1] + email_part[2])
+    sep_regex = "({}.*)?".format(re.escape(sep))
+    return "/" + email_acc + sep_regex + email_domain + "/"
+
+
+def email_forbid(word, word_eol, userdata):
+    if len(word) > 1:
+        email_str = word[1]
+        email = re.match("(?P<acc>.+)@(?P<domain>.+\..+)", email_str)
+        if not email:
+            print("That is not a valid email address")
+            return hexchat.EAT_HEXCHAT
+        to_forbid = email_cleanup(email_str, EMAIL_PROVIDERS.get(email.group("domain"), ""))
+        reason = "ban evasion"
+        if len(word) > 2:
+            reason = word_eol[2]
+        hexchat.command("OS FORBID ADD EMAIL +0 {email} {reason}".format(email=to_forbid, reason=reason))
+    else:
+        print("I require an argument")
+    return hexchat.EAT_HEXCHAT
+
+
 def masskill(word, word_eol, userdata):
     for nick in word[1:]:
         hexchat.command("OKILL {}".format(nick))
@@ -71,6 +104,7 @@ def onunload(userdata):
 
 hexchat.hook_command("okill", kill)
 hexchat.hook_command("omkill", masskill)
+hexchat.hook_command("EMAILFORBID", email_forbid)
 menu_items()
 
 print(__module_name__, "plugin loaded")
