@@ -6,6 +6,8 @@ __module_description__ = "writes pings and notices to an additional channel"
 WINDOW_FMT = ">>{name}<<"
 emitting_notice = False
 emitting_wallops = False
+# TODO: make this use a pluginpref and default to True
+use_emit_print = False  # Use emit print for notices an wallops
 
 
 def get_window(name, server=None):
@@ -41,7 +43,10 @@ def incomingnotice(word, word_eol, userdata):
         return
     con = get_window("notices")
     emitting_notice = True
-    con.emit_print("Notice", word[0], word[1])
+    if use_emit_print:
+        con.emit_print("Notice", word[0], word[1])
+    else:
+        con.prnt("\x0328-\x0329{}\x0328-\x0F\t{}".format(word[0], word[1]))
     emitting_notice = False
     return hexchat.EAT_NONE
 
@@ -52,7 +57,10 @@ def incomingwallops(word, word_eol, userdata):
         return
     con = get_window("wallops")
     emitting_wallops = True
-    con.emit_print("Receive Wallops", word[0], word[1])
+    if use_emit_print:
+        con.emit_print("Receive Wallops", word[0], word[1])
+    else:
+        con.prnt("\x0328-\x0329{}/Wallops\x0328-\x0F\t{}".format(word[0], word[1]))
     emitting_wallops = False
     return hexchat.EAT_NONE
 
