@@ -86,7 +86,15 @@ def email_forbid(word, word_eol, userdata):
 def masskill(word, word_eol, userdata):
     for nick in word[1:]:
         hexchat.command("OKILL {}".format(nick))
+    return hexchat.EAT_HEXCHAT
 
+def spamakill(word, word_eol, userdata):
+    if len(word) < 2:
+        print("I require an argument")
+        return hexchat.EAT_HEXCHAT
+    for nick in word[1:]:
+        hexchat.command("AKILL {} 1 spam bot".format(nick))
+    return hexchat.EAT_HEXCHAT
 
 def menu_items(add=True):
     for name, cmd in MENU_ITEMS:
@@ -104,6 +112,7 @@ def onunload(userdata):
 
 hexchat.hook_command("okill", kill)
 hexchat.hook_command("omkill", masskill)
+hexchat.hook_command("spamakill", spamakill)
 hexchat.hook_command("EMAILFORBID", email_forbid)
 menu_items()
 
