@@ -280,7 +280,7 @@ def cmdblockvisual(arg):
                                    "for a given user in seconds (fractions of a second are supported)")
 def cmdwhoistimeout(arg):
     args = arg.split()
-    cmd = args.pop(0)
+    cmd = args.pop(0) if len(args) > 0 else "get"
     if cmd == "set":
         if len(args) > 0:
             global whois_timeout
@@ -537,6 +537,19 @@ def menu_items(add=True):
         hexchat.command("MENU DEL \"$NICK/Watch\"")
 
 
+def cleanup_whois_timers(userdata):
+    current_time = time.time()
+    to_del = []
+    for nick in users:
+        if current_time - users[nick] >= whois_timeout:
+            to_del.append(nick)
+    for nick in to_del:
+        hexchat.command("ECHO Removing user: {}".format(nick))
+        if nick in users:
+            del users[nick]
+    return True
+
+
 @hexchat.hook_unload
 def onunload(userdata):
     for child in children:
@@ -550,6 +563,7 @@ getconfig()
 hexchat.hook_print("Server Notice", onsnotice)
 hexchat.hook_command("SNOTE", oncmd, help="USAGE: for usage, run /snote help")
 hexchat.hook_timer(15 * 1000, procleanup)
+hexchat.hook_timer(int(whois_timeout * 1000), cleanup_whois_timers)
 menu_items()
 
 print(__module_name__, "plugin loaded")
