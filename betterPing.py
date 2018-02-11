@@ -17,6 +17,8 @@ config_file = config_dir / "betterping.pickle"
 
 # TODO: check if a set is really the best idea here
 checkers = set()
+
+
 # TODO: func to parse string based bools, y/n, yes/no, true/false, etc.
 
 
@@ -66,7 +68,6 @@ class RegexChecker(Checker):
             self.regexp = re.compile(self.str, self.flags)
         except re.error as e:
             print("Regex compilation error: {}".format(e))
-            raise
 
     def _check(self, str_to_check):
         if self.full_match:
@@ -108,7 +109,6 @@ def get_checkers():
     if not config_file.exists():
         return checkers
     with config_file.open("rb") as f:
-
         return pickle.load(f)
 
 
@@ -117,7 +117,7 @@ commands = {}
 command_tuple = namedtuple("command_tuple", "func help_text")
 
 
-# Because Im lazy and I think this helps readability.
+# Because Im lazy and I think this helps readability. while removing repeated code
 def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} arguments", subcommand=True, help_msg=""):
     cmd = cmd.upper()
 
@@ -132,14 +132,23 @@ def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} argumen
                 return hexchat.EAT_ALL
 
             return ret
+
         if not subcommand:
             hexchat.hook_command(cmd, _check_args)
         else:
-            assert cmd not in commands
+            assert cmd not in commands, "{cmd} already exists in the command list".format(cmd=cmd)
             commands[cmd] = command_tuple(f, help_msg)
         return _check_args
 
     return _decorate
+
+
+def parse_true_false(str_to_parse):
+    str_to_parse = str_to_parse.casefold()
+    if str_to_parse in ("yes", "y", "ok", "true", "t"):
+        return True
+    elif str_to_parse in ("no", "false", "n", "f"):
+        return False
 
 
 @command("ping", 2, subcommand=False)
@@ -153,7 +162,7 @@ def main_command(word, word_eol, userdata):
 
 
 def msg_hook(f):
-    hexchat.hook_print("Channel Message", f)
+    hexchat.hook_print("Channel Message", f, userdata="Channel Msg Highlight")
     hexchat.hook_print("Private Message", f)
     hexchat.hook_print("Private Message to Dialog", f)
 
@@ -180,9 +189,67 @@ def help_cb(word, word_eol, userdata):
             print("{cmd:<10} | {help_text}".format(cmd=cmd, help_text=commands[cmd].help_text))
 
 
-@command("addchecker")
+checker_types = {
+    "REGEX": RegexChecker,
+    "CONTAINS": Checker,
+    "EXACT": ExactChecker,
+    "GLOB": GlobChecker
+}
+
+args_regex = re.compile(r"addchecker\s(?P<type>.+)\s(?P<case>case=?)")
+regexp = re.compile(r"addchecker\s(?:(?:arg1[=\s](P<arg1>.*)\s)|(?:arg2[=\s](?P<arg2>.*)))+")
+
+
+def parse_args(args):
+    if isinstance(args, str):
+        args = args.split()
+    while args:
+
+# /ping addchecker type case_sensistive allowed_networks allowed_channels whitelist/blacklist string
+@command("addchecker", 2)
 def add_cb(word, word_eol, userdata):
-    ...
+    req_checker = word[1].upper()
+    check_str = word_eol[2]
+    length = len(word)
+    case_sensitive = False
+    whitelist = True
+    allowed_channels = []
+    allowed_nets = []
+
+
+
+    if req_checker not in checker_types:
+        print("{} is an unknown checker type. available types are: {}")
+        return
+
+    checker = checker_types[req_checker](check_str)
+    if checker is None:
+        print("Error occurred while creating new checker {} with params {}".format(checker, check_str))
+        return
+
+    checkers.add(checker)
+
+
+@command("delchecker", 2)
+def del_cb(word, word_eol, userdata):
+    checker_str = word[1]
+    for checker in checkers:
+        if checker_str == checker.str:
+            checkers.remove(checker)
+            return
+
+    print("Checker {} not found in checker list".format(checker_str))
+
+
+def on_msg(word, word_eol, userdata):
+    emit = False
+    for checker in checkers:
+        if checker.check(word[1]):
+            emit = True
+            break
+
+    if emit:
+        hexchat.emit_print(userdata, *word)
 
 
 @hexchat.hook_unload
