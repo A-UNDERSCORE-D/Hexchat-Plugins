@@ -17,8 +17,7 @@ config_dir = Path(hexchat.get_info("configdir")).resolve() / "adconfig"
 config_dir.mkdir(exist_ok=True)
 config_file = config_dir / "betterping.pickle"
 
-# TODO: check if a set is really the best idea here
-checkers = set()
+checkers = []
 
 
 # TODO: Allow for blacklist/whitelist for networks and channels, possibly discretely
@@ -62,6 +61,11 @@ class Checker:
 
     def __str__(self):
         return "{}:{}".format(self.type, self.str)
+
+    def __eq__(self, other):
+        if not isinstance(other, Checker):
+            return NotImplemented
+        return self.__str__() == other.__str__()
 
 
 # TODO: Maybe do some sort of timeout on the compilation here?
@@ -244,7 +248,10 @@ def add_cb(word, word_eol, userdata):
     if checker is None:
         print("Error occurred while creating new checker {} with params {}".format(checker, args.phrase))
         return
-    checkers.add(checker)
+    if checker in checkers:
+        print("checker {} already exists in the checker list.".format(checker))
+        return
+    checkers.append(checker)
     save_checkers()
     print("Added checker {}".format(checker))
 
