@@ -25,7 +25,7 @@ checkers = set()
 class Checker:
     def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
         self.str = check_str
-        self.type = "contains"
+        self.type = "contains:{}".format("cs" if case_sensitive else "ci")
         if networks is None:
             networks = []
         self.nets = networks
