@@ -75,6 +75,7 @@ class RegexChecker(Checker):
             self.regexp = re.compile(self.str, self.flags)
         except re.error as e:
             print("Regex compilation error: {}".format(e))
+            raise
 
     def _check(self, str_to_check):
         match = self.regexp.match(str_to_check)
@@ -231,12 +232,15 @@ def add_cb(word, word_eol, userdata):
         return
 
     #     def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
-    checker = checker_types[args.type](
-        check_str=args.phrase,
-        case_sensitive=args.case_sensitive,
-        networks=args.networks,
-        channels=args.channels,
-    )
+    try:
+        checker = checker_types[args.type](
+            check_str=args.phrase,
+            case_sensitive=args.case_sensitive,
+            networks=args.networks,
+            channels=args.channels,
+        )
+    except re.error:
+        checker = None
     if checker is None:
         print("Error occurred while creating new checker {} with params {}".format(checker, args.phrase))
         return
