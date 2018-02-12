@@ -150,9 +150,8 @@ def main_command(word, word_eol, userdata):
 
 
 def msg_hook(f):
-    hexchat.hook_print("Channel Message", f, userdata="Channel Msg Highlight")
-    hexchat.hook_print("Private Message", f)
-    hexchat.hook_print("Private Message to Dialog", f)
+    hexchat.hook_print("Channel Message", f, userdata="Channel Msg Hilight")
+    hexchat.hook_print("Channel Action", f, userdata="Channel Action Hilight")
 
 
 @command("debug")
@@ -233,8 +232,8 @@ def add_cb(word, word_eol, userdata):
     if checker is None:
         print("Error occurred while creating new checker {} with params {}".format(checker, args.phrase))
         return
-
     checkers.add(checker)
+    print("Added checker {}".format(checker))
 
 
 @command("delchecker", 2)
@@ -248,6 +247,7 @@ def del_cb(word, word_eol, userdata):
     print("Checker {} not found in checker list".format(checker_str))
 
 
+@msg_hook
 def on_msg(word, word_eol, userdata):
     emit = False
     for checker in checkers:
