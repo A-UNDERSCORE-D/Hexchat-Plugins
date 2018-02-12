@@ -245,6 +245,7 @@ def add_cb(word, word_eol, userdata):
         print("Error occurred while creating new checker {} with params {}".format(checker, args.phrase))
         return
     checkers.add(checker)
+    save_checkers()
     print("Added checker {}".format(checker))
 
 
@@ -254,6 +255,7 @@ def del_cb(word, word_eol, userdata):
     for checker in checkers:
         if checker_str == checker.str:
             checkers.remove(checker)
+            save_checkers()
             return
 
     print("Checker {} not found in checker list".format(checker_str))
