@@ -1,8 +1,10 @@
-import re
 import pickle
+import re
+from argparse import ArgumentParser
+from collections import namedtuple
 from fnmatch import fnmatch, fnmatchcase
 from pathlib import Path
-from collections import namedtuple
+from typing import Dict
 
 import hexchat
 
@@ -19,9 +21,7 @@ config_file = config_dir / "betterping.pickle"
 checkers = set()
 
 
-# TODO: func to parse string based bools, y/n, yes/no, true/false, etc.
-
-
+# TODO: Allow for blacklist/whitelist for networks and channels, possibly discretely
 class Checker:
     def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
         self.str = check_str
@@ -58,9 +58,8 @@ class Checker:
 
 # TODO: Maybe do some sort of timeout on the compilation here?
 class RegexChecker(Checker):
-    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None, full_match=False):
+    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
         super().__init__(check_str, case_sensitive, networks, channels)
-        self.full_match = full_match
         self.case_sensitive = case_sensitive
         self.flags = re.IGNORECASE if not case_sensitive else 0
         self.type = "regex:{}".format("cs" if case_sensitive else "ci")
@@ -70,15 +69,12 @@ class RegexChecker(Checker):
             print("Regex compilation error: {}".format(e))
 
     def _check(self, str_to_check):
-        if self.full_match:
-            match = self.regexp.fullmatch(str_to_check)
-        else:
-            match = self.regexp.match(str_to_check)
+        match = self.regexp.match(str_to_check)
         return match is not None
 
 
 class GlobChecker(Checker):
-    def __init__(self, check_str, networks=None, channels=None, case_sensitive=False):
+    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
         super().__init__(check_str, case_sensitive, networks, channels)
         self.case = case_sensitive
         self.type = "glob:{}".format("ci" if not case_sensitive else "cs")
@@ -90,7 +86,7 @@ class GlobChecker(Checker):
 
 
 class ExactChecker(Checker):
-    def __init__(self, check_str, networks=None, channels=None, case_sensitive=False):
+    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
         super().__init__(check_str, case_sensitive, networks, channels)
         self.type = "exact:{}".format("ci" if not case_sensitive else "cs")
 
@@ -189,6 +185,7 @@ def help_cb(word, word_eol, userdata):
             print("{cmd:<10} | {help_text}".format(cmd=cmd, help_text=commands[cmd].help_text))
 
 
+# type: Dict[str, Checker]
 checker_types = {
     "REGEX": RegexChecker,
     "CONTAINS": Checker,
@@ -196,35 +193,49 @@ checker_types = {
     "GLOB": GlobChecker
 }
 
-args_regex = re.compile(r"addchecker\s(?P<type>.+)\s(?P<case>case=?)")
-regexp = re.compile(r"addchecker\s(?:(?:arg1[=\s](P<arg1>.*)\s)|(?:arg2[=\s](?P<arg2>.*)))+")
+# TODO: Continue implementing this
+parser = ArgumentParser(
+    prog="betterPing",
+    description="Better word highlight support for hexchat"
+)
+parser.add_argument("type", help="The type of checker you want to use", type=str.upper)
+parser.add_argument("phrase", help="The string which you want to be used to match a message", nargs="+")
+parser.add_argument("-b", "--blacklist", help="set the channel and network lists to blacklists",
+                    action="store_true", default=False)
+parser.add_argument("-c", "--channels", help="Set the channels in the whitelist or blacklist for this checker",
+                    nargs="*", default=[])
+parser.add_argument("-n", "--networks", help="Set the channels in the whitelist or blacklist for this checker",
+                    nargs="*", default=[])
+parser.add_argument("-s", "--case-sensitive",
+                    help="Set whether or not this checker will evaluate case when checking messages",
+                    default=False, action="store_true")
 
-
-def parse_args(args):
-    if isinstance(args, str):
-        args = args.split()
-    while args:
 
 # /ping addchecker type case_sensistive allowed_networks allowed_channels whitelist/blacklist string
 @command("addchecker", 2)
 def add_cb(word, word_eol, userdata):
-    req_checker = word[1].upper()
-    check_str = word_eol[2]
-    length = len(word)
-    case_sensitive = False
-    whitelist = True
-    allowed_channels = []
-    allowed_nets = []
-
-
-
-    if req_checker not in checker_types:
+    try:
+        args = parser.parse_args(word[1:])
+    except SystemExit:
+        # -h was used or bad args passed, either way, we have nothing more to do, but we must catch SystemExit, because
+        # a SystemExit will close HexChat
+        return
+    # Convert 'phrase' from a list to a string, this way you can use spaces in a phrase, though you probably shouldn't
+    # Use a regexp with \s instead because phrase 'test             test' will become 'test test'
+    args.phrase = " ".join(args.phrase)
+    if args.type not in checker_types:
         print("{} is an unknown checker type. available types are: {}")
         return
 
-    checker = checker_types[req_checker](check_str)
+    #     def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
+    checker = checker_types[args.type](
+        check_str=args.phrase,
+        case_sensitive=args.case_sensitive,
+        networks=args.networks,
+        channels=args.channels,
+    )
     if checker is None:
-        print("Error occurred while creating new checker {} with params {}".format(checker, check_str))
+        print("Error occurred while creating new checker {} with params {}".format(checker, args.phrase))
         return
 
     checkers.add(checker)
