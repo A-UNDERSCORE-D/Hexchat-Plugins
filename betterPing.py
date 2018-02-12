@@ -277,6 +277,7 @@ def on_msg(word, word_eol, userdata):
             break
 
     if emit:
+        word[0] = hexchat.strip(word[0])
         hexchat.emit_print(userdata, *word)
         return hexchat.EAT_ALL
 
