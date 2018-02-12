@@ -35,16 +35,24 @@ class Checker:
         self.chans = channels
 
         self.case_sensitive = case_sensitive
+        self.blacklist = True
 
-    def check(self, str_to_check):
+    def check_ok(self):
         cur_chan = hexchat.get_info("channel")
         cur_net = hexchat.get_info("network")
+        if self.blacklist:
+            for chan in self.chans:
+                if cur_chan == chan:
+                    return False
+            for net in self.nets:
+                if cur_net == net:
+                    return False
+        return True
 
+    def check(self, str_to_check):
         # TODO: This could cause slowdowns due to iteration. Could checking this once globally be better?
-        if not any(net.casefold() == cur_net for net in self.nets) or not \
-                any(chan.casefold() == cur_chan for chan in self.chans):
+        if not self.check_ok():
             return False
-
         return self._check(str_to_check)
 
     def _check(self, str_to_check):
@@ -257,6 +265,7 @@ def on_msg(word, word_eol, userdata):
 
     if emit:
         hexchat.emit_print(userdata, *word)
+        return hexchat.EAT_ALL
 
 
 @hexchat.hook_unload
