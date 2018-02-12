@@ -157,6 +157,10 @@ def msg_hook(f):
 
 @command("debug")
 def debug_cb(word, word_eol, userdata):
+    if not checkers:
+        print("There are no checkers currently loaded")
+        return
+    print("Checkers list is as follows:")
     for checker in checkers:
         print(checker)
 
