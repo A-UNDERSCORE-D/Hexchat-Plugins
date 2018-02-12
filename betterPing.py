@@ -124,7 +124,7 @@ def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} argumen
                 return hexchat.EAT_ALL
 
             ret = f(word, word_eol, userdata)
-            if ret is not None:
+            if ret is None:
                 return hexchat.EAT_ALL
 
             return ret
@@ -139,15 +139,7 @@ def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} argumen
     return _decorate
 
 
-def parse_true_false(str_to_parse):
-    str_to_parse = str_to_parse.casefold()
-    if str_to_parse in ("yes", "y", "ok", "true", "t"):
-        return True
-    elif str_to_parse in ("no", "false", "n", "f"):
-        return False
-
-
-@command("ping", 2, subcommand=False)
+@command("bping", 2, subcommand=False)
 def main_command(word, word_eol, userdata):
     # No need to check length because that is done for me, to a point, anyway
     cmd = word[1].upper()
