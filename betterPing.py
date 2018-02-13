@@ -147,7 +147,7 @@ command_tuple = namedtuple("command_tuple", "func help_text")
 
 
 # Because Im lazy and I think this helps readability. while removing repeated code
-def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} arguments", subcommand=True, help_msg=""):
+def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} arguments", sub_command=True, help_msg=""):
     cmd = cmd.upper()
 
     def _decorate(f):
@@ -162,7 +162,7 @@ def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} argumen
 
             return ret
 
-        if not subcommand:
+        if not sub_command:
             hexchat.hook_command(cmd, _check_args)
         else:
             assert cmd not in commands, "{cmd} already exists in the command list".format(cmd=cmd)
@@ -172,7 +172,7 @@ def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} argumen
     return _decorate
 
 
-@command("bping", 2, subcommand=False)
+@command("bping", 2, sub_command=False)
 def main_command(word, word_eol, userdata):
     # No need to check length because that is done for me, to a point, anyway
     cmd = word[1].upper()
