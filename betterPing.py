@@ -22,7 +22,7 @@ checkers = []
 
 # TODO: Allow for blacklist/whitelist for networks and channels, possibly discretely
 class Checker:
-    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
+    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None):
         self.str = check_str
         self.type = "contains:{}".format("cs" if case_sensitive else "ci")
         if networks is None:
@@ -34,19 +34,35 @@ class Checker:
         self.chans = channels
 
         self.case_sensitive = case_sensitive
-        self.blacklist = True
+        self.blacklist = blacklist
+        self.chan_bl = self.blacklist
+        self.net_bl = self.blacklist
+
+    def compile(self):
+        if not self.case_sensitive:
+            self.str = self.str.casefold()
+        return True
+
+    def check_nets(self, net_to_check=None):
+        if net_to_check is None:
+            net_to_check = hexchat.get_info("network")
+        net_to_check = net_to_check.casefold()
+        ok = any(chan == net_to_check for chan in self.chans)
+        if self.net_bl:
+            return not ok
+        return ok
+
+    def check_chans(self, chan_to_check=None):
+        if chan_to_check is None:
+            chan_to_check = hexchat.get_info("channel")
+        chan_to_check = chan_to_check.casefold()
+        ok = any(chan == chan_to_check for chan in self.chans)
+        if self.chan_bl:
+            return not ok
+        return ok
 
     def check_ok(self):
-        cur_chan = hexchat.get_info("channel")
-        cur_net = hexchat.get_info("network")
-        if self.blacklist:
-            for chan in self.chans:
-                if cur_chan == chan:
-                    return False
-            for net in self.nets:
-                if cur_net == net:
-                    return False
-        return True
+        return self.check_nets() and self.check_chans()
 
     def check(self, str_to_check):
         # TODO: This could cause slowdowns due to iteration. Could checking this once globally be better?
@@ -70,43 +86,47 @@ class Checker:
 
 # TODO: Maybe do some sort of timeout on the compilation here?
 class RegexChecker(Checker):
-    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
-        super().__init__(check_str, case_sensitive, networks, channels)
-        self.case_sensitive = case_sensitive
+    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None):
+        super().__init__(check_str, blacklist, case_sensitive, networks, channels)
         self.flags = re.IGNORECASE if not case_sensitive else 0
         self.type = "regex:{}".format("cs" if case_sensitive else "ci")
+        self.regexp = None
+
+    def compile(self):
         try:
             self.regexp = re.compile(self.str, self.flags)
+            return True
         except re.error as e:
             print("Regex compilation error: {}".format(e))
-            raise
+            return False
 
     def _check(self, str_to_check):
+        if self.regexp is None:
+            raise ValueError("RegexChecker._check() called while regexp is uncompiled")
         match = self.regexp.match(str_to_check)
         return match is not None
 
 
 class GlobChecker(Checker):
-    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
-        super().__init__(check_str, case_sensitive, networks, channels)
-        self.case = case_sensitive
-        self.type = "glob:{}".format("ci" if not case_sensitive else "cs")
+    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None):
+        super().__init__(check_str, blacklist, case_sensitive, networks, channels)
+        self.type = "glob:{}".format("ci" if not self.case_sensitive else "cs")
 
     def _check(self, str_to_check):
-        if self.case:
+        if self.case_sensitive:
             return fnmatchcase(str_to_check, self.str)
         return fnmatch(str_to_check, self.str)
 
 
 class ExactChecker(Checker):
-    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
-        super().__init__(check_str, case_sensitive, networks, channels)
+    def __init__(self, check_str, case_sensitive=False, blacklist=False, networks=None, channels=None):
+        super().__init__(check_str, blacklist, case_sensitive, networks, channels)
         self.type = "exact:{}".format("ci" if not case_sensitive else "cs")
 
     def _check(self, str_to_check):
         if self.case_sensitive:
             return self.str == str_to_check
-        return self.str.casefold() == str_to_check.casefold()
+        return self.str == str_to_check.casefold()
 
 
 def save_checkers():
@@ -235,17 +255,14 @@ def add_cb(word, word_eol, userdata):
         print("{} is an unknown checker type. available types are: {}")
         return
 
-    #     def __init__(self, check_str, case_sensitive=False, networks=None, channels=None):
-    try:
-        checker = checker_types[args.type](
-            check_str=args.phrase,
-            case_sensitive=args.case_sensitive,
-            networks=args.networks,
-            channels=args.channels,
-        )
-    except re.error:
-        checker = None
-    if checker is None:
+    checker = checker_types[args.type](
+        check_str=args.phrase,
+        case_sensitive=args.case_sensitive,
+        networks=args.networks,
+        channels=args.channels,
+        blacklist=args.blacklist
+    )
+    if not checker.compile():
         print("Error occurred while creating new checker {} with params {}".format(checker, args.phrase))
         return
     if checker in checkers:
@@ -270,13 +287,8 @@ def del_cb(word, word_eol, userdata):
 
 @msg_hook
 def on_msg(word, word_eol, userdata):
-    emit = False
-    for checker in checkers:
-        if checker.check(word[1]):
-            emit = True
-            break
-
-    if emit:
+    msg = word[1]
+    if any(checker.check(msg) for checker in checkers):
         word[0] = hexchat.strip(word[0])
         hexchat.emit_print(userdata, *word)
         return hexchat.EAT_ALL
