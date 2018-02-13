@@ -6,6 +6,7 @@ __module_name__ = "adoper"
 __module_description__ = "Aliases to OperServ commands that I use often"
 __module_version__ = "0.5"
 
+# TODO: Move this into a file
 kills_text = [
     "Roy Mustang puts on his ignition gloves and clicks his fingers in your direction. FWOOSH!",
     "It's a terrible day for rain.",
@@ -44,10 +45,10 @@ def kill(word, word_eol, userdata):
     if len(word) < 2:
         print("I need an argument, /okill nick [reason]")
     elif len(word) == 2:
-        hexchat.command("msg OperServ KILL {nick} {reason}".format(nick=word[1], reason=random.choice(kills)))
+        reason = random.choice(kills)
+        hexchat.command("msg OperServ KILL {nick} {reason}".format(nick=word[1], reason=reason))
     elif len(word) > 2:
-        hexchat.command(
-            "msg OperServ KILL {nick} {reason}".format(nick=word[1], reason=word_eol[2]))
+        hexchat.command("msg OperServ KILL {nick} {reason}".format(nick=word[1], reason=word_eol[2]))
     return hexchat.EAT_ALL
 
 
@@ -88,6 +89,7 @@ def masskill(word, word_eol, userdata):
         hexchat.command("OKILL {}".format(nick))
     return hexchat.EAT_HEXCHAT
 
+
 def spamakill(word, word_eol, userdata):
     if len(word) < 2:
         print("I require an argument")
@@ -95,6 +97,7 @@ def spamakill(word, word_eol, userdata):
     for nick in word[1:]:
         hexchat.command("AKILL {} 1 spam bot".format(nick))
     return hexchat.EAT_HEXCHAT
+
 
 def menu_items(add=True):
     for name, cmd in MENU_ITEMS:
