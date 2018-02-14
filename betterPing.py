@@ -345,4 +345,5 @@ def onunload(userdata):
     print(__module_name__, "unloaded")
 
 
+onload()
 print(__module_name__, "loaded")
