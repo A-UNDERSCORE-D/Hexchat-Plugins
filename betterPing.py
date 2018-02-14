@@ -129,7 +129,6 @@ class RegexChecker(Checker):
         if self.regexp is None:
             raise ValueError("RegexChecker._check() called while regexp is uncompiled")
         match = self.regexp.search(str_to_check)
-        print(match)
         return match is not None
 
     def __getstate__(self):
