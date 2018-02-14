@@ -24,7 +24,7 @@ checkers = []
 class Checker:
     def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None, negate=False):
         self.str = check_str
-        self.type = "{}contains:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
+        self.type_str = "contains"
         if networks is None:
             networks = []
         self.nets = networks
@@ -80,12 +80,16 @@ class Checker:
         return self.str in str_to_check
 
     def __str__(self):
-        return "{}:{}".format(self.type, self.str)
+        return "{}:{}:chans:{}:nets:{}".format(self.type, self.str, self.chans, self.nets)
 
     def __eq__(self, other):
         if not isinstance(other, Checker):
             return NotImplemented
         return self.__str__() == other.__str__()
+
+    @property
+    def type(self):
+        return "{}{}:{}".format("NEG:" if self.negate else "", self.type_str, "cs" if self.case_sensitive else "ci")
 
 
 # TODO: Maybe do some sort of timeout on the compilation here?
@@ -100,7 +104,7 @@ class RegexChecker(Checker):
             negate=negate
         )
         self.flags = re.IGNORECASE if not case_sensitive else 0
-        self.type = "{}regex:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
+        self.type_str = "regex"
         self.regexp = None
 
     def compile(self):
@@ -128,7 +132,7 @@ class GlobChecker(Checker):
             channels=channels,
             negate=negate
         )
-        self.type = "{}glob:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
+        self.type_str = "glob"
 
     def _check(self, str_to_check):
         if self.case_sensitive:
@@ -146,7 +150,7 @@ class ExactChecker(Checker):
             channels=channels,
             negate=negate
         )
-        self.type = "exact:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
+        self.type_str = "exact"
 
     def _check(self, str_to_check):
         if self.case_sensitive:
