@@ -91,6 +91,16 @@ class Checker:
     def type(self):
         return "{}{}:{}".format("NEG:" if self.negate else "", self.type_str, "cs" if self.case_sensitive else "ci")
 
+    def __getstate__(self):
+        return self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
+               self.chans, self.negate
+
+    def __setstate__(self, state):
+        self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
+            self.chans, self.negate = state
+        if not self.compile():
+            raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
+
 
 # TODO: Maybe do some sort of timeout on the compilation here?
 class RegexChecker(Checker):
@@ -118,8 +128,19 @@ class RegexChecker(Checker):
     def _check(self, str_to_check):
         if self.regexp is None:
             raise ValueError("RegexChecker._check() called while regexp is uncompiled")
-        match = self.regexp.match(str_to_check)
+        match = self.regexp.search(str_to_check)
+        print(match)
         return match is not None
+
+    def __getstate__(self):
+        return self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
+               self.chans, self.negate, self.flags
+
+    def __setstate__(self, state):
+        self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
+            self.chans, self.negate, self.flags = state
+        if not self.compile():
+            raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
 
 
 class GlobChecker(Checker):
@@ -349,5 +370,5 @@ def onunload(userdata):
     print(__module_name__, "unloaded")
 
 
-onload()
+# onload()
 print(__module_name__, "loaded")
