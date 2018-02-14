@@ -24,7 +24,7 @@ checkers = []
 class Checker:
     def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None, negate=False):
         self.str = check_str
-        self.type = "{}:contains:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
+        self.type = "{}contains:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
         if networks is None:
             networks = []
         self.nets = networks
@@ -49,7 +49,7 @@ class Checker:
         if net_to_check is None:
             net_to_check = hexchat.get_info("network")
         net_to_check = net_to_check.casefold()
-        ok = any(chan == net_to_check for chan in self.chans)
+        ok = any(net == net_to_check for net in self.nets)
         if self.net_bl:
             return not ok
         return ok
@@ -235,7 +235,7 @@ def help_cb(word, word_eol, userdata):
     else:
         print("Available commands:")
         for cmd in commands:
-            print("{cmd:<10} | {help_text}".format(cmd=cmd, help_text=commands[cmd].help_text))
+            print("{cmd}\t{help_text}".format(cmd=cmd, help_text=commands[cmd].help_text))
 
 
 # type: Dict[str, Checker]
@@ -248,7 +248,7 @@ checker_types = {
 
 # TODO: Continue implementing this
 parser = ArgumentParser(
-    prog="betterPing",
+    prog="/bping addchecker",
     description="Better word highlight support for hexchat"
 )
 parser.add_argument("type", help="The type of checker you want to use", type=str.upper)
@@ -266,7 +266,7 @@ parser.add_argument("--negate", help="inverts a checker's string", default=False
 
 
 # /ping addchecker type case_sensistive allowed_networks allowed_channels whitelist/blacklist string
-@command("addchecker", 2)
+@command("addchecker", 2, help_msg="Adds a checker to the checker list, run /bping addchecker -h for options")
 def add_cb(word, word_eol, userdata):
     try:
         args = parser.parse_args(word[1:])
