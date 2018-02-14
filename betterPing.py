@@ -204,7 +204,7 @@ def main_command(word, word_eol, userdata):
     if cmd in commands:
         commands[cmd].func(word[1:], word_eol[1:], userdata)
     else:
-        print("Unknown command {}, try /ping help for a list of commands".format(cmd))
+        print("Unknown command {}, try /bping help for a list of commands".format(cmd))
 
 
 def msg_hook(f):
@@ -212,7 +212,7 @@ def msg_hook(f):
     hexchat.hook_print("Channel Action", f, userdata="Channel Action Hilight")
 
 
-@command("debug")
+@command("debug", help_msg="Debug command used to print all currently loaded checkers")
 def debug_cb(word, word_eol, userdata):
     if not checkers:
         print("There are no checkers currently loaded")
@@ -222,7 +222,7 @@ def debug_cb(word, word_eol, userdata):
         print(checker)
 
 
-@command("help")
+@command("help", help_msg="Prints this message")
 def help_cb(word, word_eol, userdata):
     if len(word) > 1:
         cmd = word[1].upper()
@@ -278,7 +278,7 @@ def add_cb(word, word_eol, userdata):
     # Use a regexp with \s instead because phrase 'test             test' will become 'test test'
     args.phrase = " ".join(args.phrase)
     if args.type not in checker_types:
-        print("{} is an unknown checker type. available types are: {}")
+        print("{} is an unknown checker type. available types are: {}".format(args.type, ",".join(checker_types)))
         return
 
     checker = checker_types[args.type](
@@ -300,7 +300,7 @@ def add_cb(word, word_eol, userdata):
     print("Added checker {}".format(checker))
 
 
-@command("delchecker", 2)
+@command("delchecker", 2, help_msg="Deletes a checker from the checker list and saves changes to disk")
 def del_cb(word, word_eol, userdata):
     checker_str = word[1]
     for checker in checkers:
@@ -310,6 +310,21 @@ def del_cb(word, word_eol, userdata):
             return
 
     print("Checker {} not found in checker list".format(checker_str))
+
+
+@command("manual_load", help_msg="Debug command used to force loading of checkers from disk")
+def manual_load_cb(word, word_eol, userdata):
+    global checkers
+    print("Loading from disk")
+    print("Current checkers: {}".format(checkers))
+    checkers = get_checkers()
+    print("New checkers: {}".format(checkers))
+
+
+@command("manual_save", help_msg="Debug command used to force saving of checkers to disk")
+def manual_save_cb(word, word_eol, userdata):
+    print("Saving to disk")
+    save_checkers()
 
 
 @msg_hook
