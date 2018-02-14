@@ -22,9 +22,9 @@ checkers = []
 
 # TODO: Allow for blacklist/whitelist for networks and channels, possibly discretely
 class Checker:
-    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None):
+    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None, negate=False):
         self.str = check_str
-        self.type = "contains:{}".format("cs" if case_sensitive else "ci")
+        self.type = "{}:contains:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
         if networks is None:
             networks = []
         self.nets = networks
@@ -37,6 +37,8 @@ class Checker:
         self.blacklist = blacklist
         self.chan_bl = self.blacklist
         self.net_bl = self.blacklist
+
+        self.negate = negate
 
     def compile(self):
         if not self.case_sensitive:
@@ -68,6 +70,8 @@ class Checker:
         # TODO: This could cause slowdowns due to iteration. Could checking this once globally be better?
         if not self.check_ok():
             return False
+        if self.negate:
+            return not self._check(str_to_check)
         return self._check(str_to_check)
 
     def _check(self, str_to_check):
@@ -86,10 +90,17 @@ class Checker:
 
 # TODO: Maybe do some sort of timeout on the compilation here?
 class RegexChecker(Checker):
-    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None):
-        super().__init__(check_str, blacklist, case_sensitive, networks, channels)
+    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None, negate=False):
+        super().__init__(
+            check_str=check_str,
+            blacklist=blacklist,
+            case_sensitive=case_sensitive,
+            networks=networks,
+            channels=channels,
+            negate=negate
+        )
         self.flags = re.IGNORECASE if not case_sensitive else 0
-        self.type = "regex:{}".format("cs" if case_sensitive else "ci")
+        self.type = "{}regex:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
         self.regexp = None
 
     def compile(self):
@@ -108,9 +119,16 @@ class RegexChecker(Checker):
 
 
 class GlobChecker(Checker):
-    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None):
-        super().__init__(check_str, blacklist, case_sensitive, networks, channels)
-        self.type = "glob:{}".format("ci" if not self.case_sensitive else "cs")
+    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None, negate=False):
+        super().__init__(
+            check_str=check_str,
+            blacklist=blacklist,
+            case_sensitive=case_sensitive,
+            networks=networks,
+            channels=channels,
+            negate=negate
+        )
+        self.type = "{}glob:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
 
     def _check(self, str_to_check):
         if self.case_sensitive:
@@ -119,9 +137,16 @@ class GlobChecker(Checker):
 
 
 class ExactChecker(Checker):
-    def __init__(self, check_str, case_sensitive=False, blacklist=False, networks=None, channels=None):
-        super().__init__(check_str, blacklist, case_sensitive, networks, channels)
-        self.type = "exact:{}".format("ci" if not case_sensitive else "cs")
+    def __init__(self, check_str, case_sensitive=False, blacklist=False, networks=None, channels=None, negate=False):
+        super().__init__(
+            check_str=check_str,
+            blacklist=blacklist,
+            case_sensitive=case_sensitive,
+            networks=networks,
+            channels=channels,
+            negate=negate
+        )
+        self.type = "exact:{}".format("NEG:" if negate else "", "cs" if case_sensitive else "ci")
 
     def _check(self, str_to_check):
         if self.case_sensitive:
@@ -237,6 +262,7 @@ parser.add_argument("-n", "--networks", help="Set the channels in the whitelist 
 parser.add_argument("-s", "--case-sensitive",
                     help="Set whether or not this checker will evaluate case when checking messages",
                     default=False, action="store_true")
+parser.add_argument("--negate", help="inverts a checker's string", default=False, action="store_true")
 
 
 # /ping addchecker type case_sensistive allowed_networks allowed_channels whitelist/blacklist string
@@ -260,7 +286,8 @@ def add_cb(word, word_eol, userdata):
         case_sensitive=args.case_sensitive,
         networks=args.networks,
         channels=args.channels,
-        blacklist=args.blacklist
+        blacklist=args.blacklist,
+        negate=args.negate
     )
     if not checker.compile():
         print("Error occurred while creating new checker {} with params {}".format(checker, args.phrase))
@@ -292,6 +319,10 @@ def on_msg(word, word_eol, userdata):
         word[0] = hexchat.strip(word[0])
         hexchat.emit_print(userdata, *word)
         return hexchat.EAT_ALL
+
+
+def onload():
+    get_checkers()
 
 
 @hexchat.hook_unload
