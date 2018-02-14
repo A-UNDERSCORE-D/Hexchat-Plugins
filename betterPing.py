@@ -9,7 +9,7 @@ from typing import Dict
 import hexchat
 
 __module_name__ = "BetterPing"
-__module_version__ = "1.0"
+__module_version__ = "1.1"
 __module_description__ = ""
 
 config = None
