@@ -64,7 +64,9 @@ class Checker:
         return ok
 
     def check_ok(self):
-        return self.check_nets() and self.check_chans()
+        # There does not seem to be a way to find a channel's type without hexchat.get_list("channels")[0].type
+        # Which seems rather slow, to be tested.
+        return self.check_nets() and self.check_chans() and not hexchat.get_info("channel").startswith(">>")
 
     def check(self, str_to_check):
         # TODO: This could cause slowdowns due to iteration. Could checking this once globally be better?
