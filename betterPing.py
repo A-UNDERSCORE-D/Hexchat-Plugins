@@ -9,7 +9,7 @@ from typing import Dict
 import hexchat
 
 __module_name__ = "BetterPing"
-__module_version__ = "1.1"
+__module_version__ = "1.1.1"
 __module_description__ = ""
 
 config = None
@@ -22,7 +22,7 @@ checkers = []
 
 # TODO: Allow for blacklist/whitelist for networks and channels, possibly discretely
 class Checker:
-    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None, negate=False):
+    def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
         self.str = check_str
         self.type_str = "contains"
         if networks is None:
@@ -117,7 +117,7 @@ class Checker:
 
 # TODO: Maybe do some sort of timeout on the compilation here?
 class RegexChecker(Checker):
-    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None, negate=False):
+    def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
             blacklist=blacklist,
@@ -160,7 +160,7 @@ class RegexChecker(Checker):
 
 
 class GlobChecker(Checker):
-    def __init__(self, check_str, blacklist=False, case_sensitive=False, networks=None, channels=None, negate=False):
+    def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
             blacklist=blacklist,
@@ -178,7 +178,7 @@ class GlobChecker(Checker):
 
 
 class ExactChecker(Checker):
-    def __init__(self, check_str, case_sensitive=False, blacklist=False, networks=None, channels=None, negate=False):
+    def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
             blacklist=blacklist,
@@ -295,7 +295,7 @@ parser = ArgumentParser(
 parser.add_argument("type", help="The type of checker you want to use", type=str.upper)
 parser.add_argument("phrase", help="The string which you want to be used to match a message", nargs="+")
 parser.add_argument("-b", "--blacklist", help="set the channel and network lists to blacklists",
-                    action="store_true", default=False)
+                    action="store_false", default=True)
 parser.add_argument("-c", "--channels", help="Set the channels in the whitelist or blacklist for this checker",
                     nargs="+", default=[])
 parser.add_argument("-n", "--networks", help="Set the channels in the whitelist or blacklist for this checker",
