@@ -9,7 +9,7 @@ from typing import Dict
 import hexchat
 
 __module_name__ = "BetterPing"
-__module_version__ = "1.1.1"
+__module_version__ = "1.1.2"
 __module_description__ = ""
 
 config = None
@@ -380,7 +380,8 @@ def on_msg(word, word_eol, userdata):
 
 
 def onload():
-    get_checkers()
+    global checkers
+    checkers = get_checkers()
 
 
 @hexchat.hook_unload
