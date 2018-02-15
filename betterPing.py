@@ -375,6 +375,7 @@ def on_msg(word, word_eol, userdata):
     if any(checker.check(msg) for checker in checkers):
         word[0] = hexchat.strip(word[0])
         hexchat.emit_print(userdata, *word)
+        hexchat.command("GUI COLOR 3")
         return hexchat.EAT_ALL
 
 
@@ -387,5 +388,5 @@ def onunload(userdata):
     print(__module_name__, "unloaded")
 
 
-# onload()
+onload()
 print(__module_name__, "loaded")
