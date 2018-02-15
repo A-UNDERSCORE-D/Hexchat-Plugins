@@ -331,6 +331,7 @@ def del_cb(word, word_eol, userdata):
         if checker_str == checker.str:
             checkers.remove(checker)
             save_checkers()
+            print("deleted checker {}".format(checker))
             return
 
     print("Checker {} not found in checker list".format(checker_str))
