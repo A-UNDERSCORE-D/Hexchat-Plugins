@@ -97,9 +97,20 @@ class Checker:
 
     def __setstate__(self, state):
         self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
-            self.chans, self.negate = state
+        self.chans, self.negate = state
         if not self.compile():
             raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
+
+    def __repr__(self):
+        return "{}Checker(check_str={}, blacklist={}, case_sensitive={}, networks={}, channels={}, negate={})".format(
+            self.type_str,
+            self.str,
+            self.blacklist,
+            self.case_sensitive,
+            self.nets,
+            self.chans,
+            self.negate
+        )
 
 
 # TODO: Maybe do some sort of timeout on the compilation here?
@@ -136,10 +147,14 @@ class RegexChecker(Checker):
                self.chans, self.negate, self.flags
 
     def __setstate__(self, state):
-        self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
-            self.chans, self.negate, self.flags = state
+        self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets,\
+         self.chans, self.negate, self.flags = state
         if not self.compile():
             raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
+
+    def __repr__(self):
+        return "RegexChecker(check_str={}, blacklist={}, case_sensitive={}, networks={}, channels={}, " \
+               "negate={})".format(self.str, self.blacklist, self.case_sensitive, self.nets, self.chans, self.negate)
 
 
 class GlobChecker(Checker):
@@ -243,7 +258,7 @@ def debug_cb(word, word_eol, userdata):
         return
     print("Checkers list is as follows:")
     for checker in checkers:
-        print(checker)
+        print("{!r}".format(checker))
 
 
 @command("help", help_msg="Prints this message")
@@ -280,9 +295,9 @@ parser.add_argument("phrase", help="The string which you want to be used to matc
 parser.add_argument("-b", "--blacklist", help="set the channel and network lists to blacklists",
                     action="store_true", default=False)
 parser.add_argument("-c", "--channels", help="Set the channels in the whitelist or blacklist for this checker",
-                    nargs="*", default=[])
+                    nargs="+", default=[])
 parser.add_argument("-n", "--networks", help="Set the channels in the whitelist or blacklist for this checker",
-                    nargs="*", default=[])
+                    nargs="+", default=[])
 parser.add_argument("-s", "--case-sensitive",
                     help="Set whether or not this checker will evaluate case when checking messages",
                     default=False, action="store_true")
