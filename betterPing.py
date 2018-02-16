@@ -9,7 +9,7 @@ from typing import Dict
 import hexchat
 
 __module_name__ = "BetterPing"
-__module_version__ = "1.1.2"
+__module_version__ = "1.1.3"
 __module_description__ = ""
 
 config = None
@@ -374,8 +374,10 @@ def on_msg(word, word_eol, userdata):
     msg = word[1]
     if any(checker.check(msg) for checker in checkers):
         word[0] = hexchat.strip(word[0])
-        hexchat.emit_print(userdata, *word)
-        hexchat.command("GUI COLOR 3")
+        # Get the current context before emit_printing, because other plugins can change the current context
+        ctx = hexchat.get_context()
+        ctx.emit_print(userdata, *word)
+        ctx.command("GUI COLOR 3")
         return hexchat.EAT_ALL
 
 
