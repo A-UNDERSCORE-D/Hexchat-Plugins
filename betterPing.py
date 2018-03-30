@@ -52,15 +52,20 @@ class AbstractChecker(ABC):
         if channels is None:
             channels = []
         self.channels = channels
-
+        self.channels_split = self.split_lists(self.channels)
+        self.networks_split = self.split_lists(self.networks)
         self.case_sensitive = case_sensitive
         self.negate = negate
         self.channel_cache = {}
         self.network_cache = {}
 
     @staticmethod
-    def check_list(to_check: str, list_to_check: List[ListOption], cache: Dict = None) -> bool:
-        ret = False
+    def split_lists(list_in: List[ListOption]):
+        return [entry for entry in list_in if not entry.blacklist], [entry for entry in list_in if entry.blacklist]
+
+    @staticmethod
+    def check_list(to_check: str, list_to_check: List[ListOption], cache: Dict = None, default=True) -> bool:
+        ret = None
         if cache is None:
             cache = {}
         try:
@@ -74,6 +79,8 @@ class AbstractChecker(ABC):
                 elif entry == to_check:
                     ret = True
                     break
+        if ret is None:
+            ret = default
         cache[to_check] = ret
         return ret
 
@@ -83,7 +90,8 @@ class AbstractChecker(ABC):
         net_to_check = net_to_check.casefold()
         if not self.networks:
             return True
-        return self.check_list(net_to_check, self.networks, self.network_cache)
+        whitelist_only = self.networks_split[1] and not self.networks_split[0]
+        return self.check_list(net_to_check, self.networks, self.network_cache, whitelist_only)
 
     def check_channels(self, chan_to_check: str = None) -> bool:
         if chan_to_check is None:
@@ -91,12 +99,13 @@ class AbstractChecker(ABC):
         chan_to_check = chan_to_check.casefold()
         if not self.channels:
             return True
-        return self.check_list(chan_to_check, self.channels, self.channel_cache)
+        whitelist_only = self.channels_split[1] and not self.channels_split[0]
+        return self.check_list(chan_to_check, self.channels, self.channel_cache, whitelist_only)
 
     def check_ok(self):
         # There does not seem to be a way to find a channel's type without hexchat.get_list("channels")[0].type
         # Which seems rather slow, to be tested.
-        return self.check_networks() and self.check_channels() and not hexchat.get_info("channel").startswith(">>")
+        return (self.check_networks() and self.check_channels()) and not hexchat.get_info("channel").startswith(">>")
 
     def check(self, str_to_check):
         if not self.check_ok():
@@ -138,6 +147,8 @@ class AbstractChecker(ABC):
             raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
         self.network_cache = {}
         self.channel_cache = {}
+        self.channels_split = self.split_lists(self.channels)
+        self.networks_split = self.split_lists(self.networks)
 
     @abstractmethod
     def _check(self, str_to_check: str) -> bool:
@@ -151,8 +162,8 @@ class AbstractChecker(ABC):
 class ContainsChecker(AbstractChecker):
     def _check(self, str_to_check):
         if self.case_sensitive:
-            return self.str.casefold() in str_to_check.casefold()
-        return self.str in str_to_check
+            return self.str in str_to_check
+        return self.str.casefold() in str_to_check.casefold()
 
 
 # TODO: Maybe do some sort of timeout on the compilation here?
@@ -280,6 +291,8 @@ def debug_cb(word, word_eol, userdata):
     print("Checkers list is as follows:")
     for checker in checkers:
         print("{!r}".format(checker))
+        print(checker.channel_cache)
+        print(checker.network_cache)
 
 
 @command("help", help_msg="Prints this message")
