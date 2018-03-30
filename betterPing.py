@@ -5,13 +5,14 @@ from argparse import ArgumentParser
 from collections import namedtuple
 from fnmatch import fnmatch, fnmatchcase
 from pathlib import Path
-from typing import Dict, List
+from shlex import split
+from typing import Dict, List, Type
 
 import hexchat
 
 __module_name__ = "BetterPing"
-__module_version__ = "1.1.3"
-__module_description__ = ""
+__module_version__ = "1.2.1"
+__module_description__ = "More controllable highlights"
 
 config = None
 config_dir = Path(hexchat.get_info("configdir")).resolve() / "adconfig"
@@ -27,50 +28,70 @@ class ListOption:
         self.blacklist = blacklist
 
     def __str__(self):
-        return self.__repr__()
+        return f"{'BLACKLISTED' if self.blacklist else 'WHITELISTED'}: {self.entry}"
 
     def __repr__(self):
         return f"ListOption(entry='{self.entry}', blacklist={self.blacklist})"
 
+    @staticmethod
+    def pretty_print(to_print, indent=2):
+        out = ""
+        indent_str = " " * indent
+        for item in to_print:
+            out += indent_str + str(item) + "\n"
+        return out[:-1]
 
-# TODO: network/channel blacklist check cache
+
 class AbstractChecker(ABC):
-    def __init__(self, check_str, blacklist, case_sensitive, networks: List[ListOption] = None,
+    def __init__(self, check_str, case_sensitive, networks: List[ListOption] = None,
                  channels: List[ListOption] = None, negate=False):
         self.str = check_str
         if networks is None:
             networks = []
         self.networks = networks
-
         if channels is None:
             channels = []
         self.channels = channels
 
         self.case_sensitive = case_sensitive
-        self.blacklist = blacklist
         self.negate = negate
+        self.channel_cache = {}
+        self.network_cache = {}
 
     @staticmethod
-    def check_list(to_check: str, list_to_check: List[ListOption]) -> bool:
-        for list_entry in list_to_check:
-            entry = list_entry.entry.casefold()
-            if list_entry.blacklist and entry == to_check:
-                return False
-            elif entry == to_check:
-                return True
-        return False
+    def check_list(to_check: str, list_to_check: List[ListOption], cache: Dict = None) -> bool:
+        ret = False
+        if cache is None:
+            cache = {}
+        try:
+            return cache[to_check]
+        except LookupError:
+            for list_entry in list_to_check:
+                entry = list_entry.entry.casefold()
+                if list_entry.blacklist and entry == to_check:
+                    ret = False
+                    break
+                elif entry == to_check:
+                    ret = True
+                    break
+        cache[to_check] = ret
+        return ret
 
     def check_networks(self, net_to_check: str = None):
         if net_to_check is None:
             net_to_check = hexchat.get_info("network")
         net_to_check = net_to_check.casefold()
-        return self.check_list(net_to_check, self.networks)
+        if not self.networks:
+            return True
+        return self.check_list(net_to_check, self.networks, self.network_cache)
 
     def check_channels(self, chan_to_check: str = None) -> bool:
         if chan_to_check is None:
             chan_to_check = hexchat.get_info("channel")
         chan_to_check = chan_to_check.casefold()
-        return self.check_list(chan_to_check, self.channels)
+        if not self.channels:
+            return True
+        return self.check_list(chan_to_check, self.channels, self.channel_cache)
 
     def check_ok(self):
         # There does not seem to be a way to find a channel's type without hexchat.get_list("channels")[0].type
@@ -78,7 +99,6 @@ class AbstractChecker(ABC):
         return self.check_networks() and self.check_channels() and not hexchat.get_info("channel").startswith(">>")
 
     def check(self, str_to_check):
-        # TODO: This could cause slowdowns due to iteration. Could checking this once globally be better?
         if not self.check_ok():
             return False
         if self.negate:
@@ -86,12 +106,18 @@ class AbstractChecker(ABC):
         return self._check(str_to_check)
 
     def __str__(self):
-        return self.__repr__()
+        out = f"{self.type_str}: string '{self.str}' case sensitive: {self.case_sensitive} negated: " \
+               f"{self.negate}"
+        if self.networks:
+            out += f"\n`Networks:\n{ListOption.pretty_print(self.networks)}"
+        if self.channels:
+            out += f"\n`Channels:\n{ListOption.pretty_print(self.channels)}"
+        out += "\n"
+        return out
 
     def __repr__(self):
-        return f"{self.type_str}(check_str='{self.str}', " \
-               f"blacklist={self.blacklist}, case_sensitive={self.case_sensitive}, " \
-               f"networks={self.networks}, channels={self.channels}, negate={self.negate})"
+        return f"{self.type_str}(check_str='{self.str}', case_sensitive={self.case_sensitive},\n " \
+               f"networks={self.networks},\n channels={self.channels}, \nnegate={self.negate})"
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -104,12 +130,14 @@ class AbstractChecker(ABC):
         return True
 
     def __getstate__(self):
-        return self.str, self.case_sensitive, self.blacklist, self.networks, self.channels, self.negate
+        return self.str, self.case_sensitive, self.networks, self.channels, self.negate
 
     def __setstate__(self, state):
-        self.str, self.case_sensitive, self.blacklist, self.networks, self.channels, self.negate = state
+        self.str, self.case_sensitive, self.networks, self.channels, self.negate = state
         if not self.compile():
             raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
+        self.network_cache = {}
+        self.channel_cache = {}
 
     @abstractmethod
     def _check(self, str_to_check: str) -> bool:
@@ -120,7 +148,6 @@ class AbstractChecker(ABC):
         return self.__class__.__name__
 
 
-# TODO: Allow for blacklist/whitelist for networks and channels, possibly discretely
 class ContainsChecker(AbstractChecker):
     def _check(self, str_to_check):
         if self.case_sensitive:
@@ -130,21 +157,19 @@ class ContainsChecker(AbstractChecker):
 
 # TODO: Maybe do some sort of timeout on the compilation here?
 class RegexChecker(AbstractChecker):
-    def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
+    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
-            blacklist=blacklist,
             case_sensitive=case_sensitive,
             networks=networks,
             channels=channels,
             negate=negate
         )
-        self.flags = re.IGNORECASE if not case_sensitive else 0
         self.regexp = None
 
     def compile(self):
         try:
-            self.regexp = re.compile(self.str, self.flags)
+            self.regexp = re.compile(self.str, re.IGNORECASE if self.case_sensitive else 0)
             return True
         except re.error as e:
             print("Regex compilation error: {}".format(e))
@@ -156,20 +181,11 @@ class RegexChecker(AbstractChecker):
         match = self.regexp.search(str_to_check)
         return match is not None
 
-    def __getstate__(self):
-        return self.str, self.case_sensitive, self.blacklist, self.nets, self.chans, self.negate, self.flags
-
-    def __setstate__(self, state):
-        self.str, self.case_sensitive, self.blacklist, self.nets, self.chans, self.negate, self.flags = state
-        if not self.compile():
-            raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
-
 
 class GlobChecker(AbstractChecker):
-    def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
+    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
-            blacklist=blacklist,
             case_sensitive=case_sensitive,
             networks=networks,
             channels=channels,
@@ -183,10 +199,9 @@ class GlobChecker(AbstractChecker):
 
 
 class ExactChecker(AbstractChecker):
-    def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
+    def __init__(self, check_str, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
-            blacklist=blacklist,
             case_sensitive=case_sensitive,
             networks=networks,
             channels=channels,
@@ -283,8 +298,7 @@ def help_cb(word, word_eol, userdata):
             print("{cmd}\t{help_text}".format(cmd=cmd, help_text=commands[cmd].help_text))
 
 
-# type: Dict[str, ContainsChecker]
-checker_types = {
+checker_types: Dict[str, Type[AbstractChecker]] = {
     "REGEX": RegexChecker,
     "CONTAINS": ContainsChecker,
     "EXACT": ExactChecker,
@@ -296,32 +310,50 @@ parser = ArgumentParser(
     prog="/bping addchecker",
     description="Better word highlight support for hexchat"
 )
-parser.add_argument("type", help="The type of checker you want to use", type=str.upper)
-parser.add_argument("phrase", help="The string which you want to be used to match a message", nargs="+")
-parser.add_argument("-b", "--blacklist", help="set the channel and network lists to blacklists",
-                    action="store_false", default=True)
-parser.add_argument("-c", "--channels", help="Set the channels in the whitelist or blacklist for this checker",
-                    nargs="+", default=[])
-parser.add_argument("-n", "--networks", help="Set the channels in the whitelist or blacklist for this checker",
-                    nargs="+", default=[])
-parser.add_argument("-s", "--case-sensitive",
-                    help="Set whether or not this checker will evaluate case when checking messages",
-                    default=False, action="store_true")
-parser.add_argument("--negate", help="inverts a checker's string", default=False, action="store_true")
 
 
-# /ping addchecker type case_sensistive allowed_networks allowed_channels whitelist/blacklist string
+def init_parser(prsr: ArgumentParser):
+    prsr.add_argument("type", help="The type of checker you want to use", type=str.upper)
+    prsr.add_argument("phrase", help="The string which you want to be used to match a message")
+    prsr.add_argument(
+        "-c", "--channels", help="Sets the channels that will be whitelisted by this checker", nargs="+", default=[]
+    )
+    prsr.add_argument(
+        "-bc", "--blacklist_channels", help="Sets the channels that will be blacklisted by this checker", nargs="+",
+        default=[]
+    )
+    prsr.add_argument(
+        "-n", "--networks", help="Sets the networks that will be whitelisted by this checker", nargs="+", default=[]
+    )
+    prsr.add_argument(
+        "-bn", "--blacklist_networks", help="Sets the networks that will be blacklisted by this checker", nargs="+",
+        default=[]
+    )
+    prsr.add_argument(
+        "-s", "--case-sensitive", help="Set whether or not this checker will evaluate case when checking messages",
+        default=False, action="store_true"
+    )
+    prsr.add_argument("--negate", help="inverts a checker's string", default=False, action="store_true")
+
+
+def build_list(whitelist: List[str], blacklist: List[str]) -> List[ListOption]:
+    out = []
+    for opt in whitelist:
+        out.append(ListOption(opt, False))
+    for opt in blacklist:
+        out.append(ListOption(opt, True))
+    return out
+
+
 @command("addchecker", 2, help_msg="Adds a checker to the checker list, run /bping addchecker -h for options")
 def add_cb(word, word_eol, userdata):
     try:
-        args = parser.parse_args(word[1:])
+        split_args = split(word_eol[1])
+        args = parser.parse_args(split_args)
     except SystemExit:
         # -h was used or bad args passed, either way, we have nothing more to do, but we must catch SystemExit, because
         # a SystemExit will close HexChat
         return
-    # Convert 'phrase' from a list to a string, this way you can use spaces in a phrase, though you probably shouldn't
-    # Use a regexp with \s instead because phrase 'test             test' will become 'test test'
-    args.phrase = " ".join(args.phrase)
     if args.type not in checker_types:
         print("{} is an unknown checker type. available types are: {}".format(args.type, ",".join(checker_types)))
         return
@@ -329,9 +361,8 @@ def add_cb(word, word_eol, userdata):
     checker = checker_types[args.type](
         check_str=args.phrase,
         case_sensitive=args.case_sensitive,
-        networks=args.networks,
-        channels=args.channels,
-        blacklist=args.blacklist,
+        networks=build_list(args.networks, args.blacklist_networks),
+        channels=build_list(args.channels, args.blacklist_channels),
         negate=args.negate
     )
     if not checker.compile():
@@ -356,6 +387,14 @@ def del_cb(word, word_eol, userdata):
             return
 
     print("Checker {} not found in checker list".format(checker_str))
+
+
+@command("listcheckers", help_msg="Lists all active checkers")
+def list_cb(word, word_eol, userdata):
+    if not checkers:
+        print("There are no currently loaded checkers")
+        return
+    print("---\n".join(checker.__str__() for checker in checkers))
 
 
 @command("manual_load", help_msg="Debug command used to force loading of checkers from disk")
@@ -390,6 +429,7 @@ def on_msg(word, word_eol, userdata):
 def onload():
     global checkers
     checkers = get_checkers()
+    init_parser(parser)
 
 
 @hexchat.hook_unload
