@@ -1,10 +1,11 @@
 import pickle
 import re
+from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 from collections import namedtuple
 from fnmatch import fnmatch, fnmatchcase
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import hexchat
 
@@ -20,53 +21,61 @@ config_file = config_dir / "betterping.pickle"
 checkers = []
 
 
-# TODO: Allow for blacklist/whitelist for networks and channels, possibly discretely
-class Checker:
-    def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
+class ListOption:
+    def __init__(self, entry: str, blacklist=False):
+        self.entry = entry
+        self.blacklist = blacklist
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return f"ListOption(entry='{self.entry}', blacklist={self.blacklist})"
+
+
+# TODO: network/channel blacklist check cache
+class AbstractChecker(ABC):
+    def __init__(self, check_str, blacklist, case_sensitive, networks: List[ListOption] = None,
+                 channels: List[ListOption] = None, negate=False):
         self.str = check_str
-        self.type_str = "contains"
         if networks is None:
             networks = []
-        self.nets = networks
+        self.networks = networks
 
         if channels is None:
             channels = []
-        self.chans = channels
+        self.channels = channels
 
         self.case_sensitive = case_sensitive
         self.blacklist = blacklist
-        self.chan_bl = self.blacklist
-        self.net_bl = self.blacklist
-
         self.negate = negate
 
-    def compile(self):
-        if not self.case_sensitive:
-            self.str = self.str.casefold()
-        return True
+    @staticmethod
+    def check_list(to_check: str, list_to_check: List[ListOption]) -> bool:
+        for list_entry in list_to_check:
+            entry = list_entry.entry.casefold()
+            if list_entry.blacklist and entry == to_check:
+                return False
+            elif entry == to_check:
+                return True
+        return False
 
-    def check_nets(self, net_to_check=None):
+    def check_networks(self, net_to_check: str = None):
         if net_to_check is None:
             net_to_check = hexchat.get_info("network")
         net_to_check = net_to_check.casefold()
-        ok = any(net == net_to_check for net in self.nets)
-        if self.net_bl:
-            return not ok
-        return ok
+        return self.check_list(net_to_check, self.networks)
 
-    def check_chans(self, chan_to_check=None):
+    def check_channels(self, chan_to_check: str = None) -> bool:
         if chan_to_check is None:
             chan_to_check = hexchat.get_info("channel")
         chan_to_check = chan_to_check.casefold()
-        ok = any(chan == chan_to_check for chan in self.chans)
-        if self.chan_bl:
-            return not ok
-        return ok
+        return self.check_list(chan_to_check, self.channels)
 
     def check_ok(self):
         # There does not seem to be a way to find a channel's type without hexchat.get_list("channels")[0].type
         # Which seems rather slow, to be tested.
-        return self.check_nets() and self.check_chans() and not hexchat.get_info("channel").startswith(">>")
+        return self.check_networks() and self.check_channels() and not hexchat.get_info("channel").startswith(">>")
 
     def check(self, str_to_check):
         # TODO: This could cause slowdowns due to iteration. Could checking this once globally be better?
@@ -76,47 +85,51 @@ class Checker:
             return not self._check(str_to_check)
         return self._check(str_to_check)
 
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return f"{self.type_str}(check_str='{self.str}', " \
+               f"blacklist={self.blacklist}, case_sensitive={self.case_sensitive}, " \
+               f"networks={self.networks}, channels={self.channels}, negate={self.negate})"
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return self.__str__() == other.__str__()
+
+    def compile(self) -> bool:
+        if not self.case_sensitive:
+            self.str = self.str.casefold()
+        return True
+
+    def __getstate__(self):
+        return self.str, self.case_sensitive, self.blacklist, self.networks, self.channels, self.negate
+
+    def __setstate__(self, state):
+        self.str, self.case_sensitive, self.blacklist, self.networks, self.channels, self.negate = state
+        if not self.compile():
+            raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
+
+    @abstractmethod
+    def _check(self, str_to_check: str) -> bool:
+        ...
+
+    @property
+    def type_str(self):
+        return self.__class__.__name__
+
+
+# TODO: Allow for blacklist/whitelist for networks and channels, possibly discretely
+class ContainsChecker(AbstractChecker):
     def _check(self, str_to_check):
         if self.case_sensitive:
             return self.str.casefold() in str_to_check.casefold()
         return self.str in str_to_check
 
-    def __str__(self):
-        return "{}:{}:chans:{}:nets:{}".format(self.type, self.str, self.chans, self.nets)
-
-    def __eq__(self, other):
-        if not isinstance(other, Checker):
-            return NotImplemented
-        return self.__str__() == other.__str__()
-
-    @property
-    def type(self):
-        return "{}{}:{}".format("NEG:" if self.negate else "", self.type_str, "cs" if self.case_sensitive else "ci")
-
-    def __getstate__(self):
-        return self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
-               self.chans, self.negate
-
-    def __setstate__(self, state):
-        self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
-        self.chans, self.negate = state
-        if not self.compile():
-            raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
-
-    def __repr__(self):
-        return "{}Checker(check_str={}, blacklist={}, case_sensitive={}, networks={}, channels={}, negate={})".format(
-            self.type_str,
-            self.str,
-            self.blacklist,
-            self.case_sensitive,
-            self.nets,
-            self.chans,
-            self.negate
-        )
-
 
 # TODO: Maybe do some sort of timeout on the compilation here?
-class RegexChecker(Checker):
+class RegexChecker(AbstractChecker):
     def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
@@ -127,7 +140,6 @@ class RegexChecker(Checker):
             negate=negate
         )
         self.flags = re.IGNORECASE if not case_sensitive else 0
-        self.type_str = "regex"
         self.regexp = None
 
     def compile(self):
@@ -145,21 +157,15 @@ class RegexChecker(Checker):
         return match is not None
 
     def __getstate__(self):
-        return self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets, \
-               self.chans, self.negate, self.flags
+        return self.str, self.case_sensitive, self.blacklist, self.nets, self.chans, self.negate, self.flags
 
     def __setstate__(self, state):
-        self.str, self.type_str, self.case_sensitive, self.blacklist, self.net_bl, self.chan_bl, self.nets,\
-         self.chans, self.negate, self.flags = state
+        self.str, self.case_sensitive, self.blacklist, self.nets, self.chans, self.negate, self.flags = state
         if not self.compile():
             raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
 
-    def __repr__(self):
-        return "RegexChecker(check_str={}, blacklist={}, case_sensitive={}, networks={}, channels={}, " \
-               "negate={})".format(self.str, self.blacklist, self.case_sensitive, self.nets, self.chans, self.negate)
 
-
-class GlobChecker(Checker):
+class GlobChecker(AbstractChecker):
     def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
@@ -169,7 +175,6 @@ class GlobChecker(Checker):
             channels=channels,
             negate=negate
         )
-        self.type_str = "glob"
 
     def _check(self, str_to_check):
         if self.case_sensitive:
@@ -177,7 +182,7 @@ class GlobChecker(Checker):
         return fnmatch(str_to_check, self.str)
 
 
-class ExactChecker(Checker):
+class ExactChecker(AbstractChecker):
     def __init__(self, check_str, blacklist=True, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
             check_str=check_str,
@@ -187,7 +192,6 @@ class ExactChecker(Checker):
             channels=channels,
             negate=negate
         )
-        self.type_str = "exact"
 
     def _check(self, str_to_check):
         if self.case_sensitive:
@@ -279,10 +283,10 @@ def help_cb(word, word_eol, userdata):
             print("{cmd}\t{help_text}".format(cmd=cmd, help_text=commands[cmd].help_text))
 
 
-# type: Dict[str, Checker]
+# type: Dict[str, ContainsChecker]
 checker_types = {
     "REGEX": RegexChecker,
-    "CONTAINS": Checker,
+    "CONTAINS": ContainsChecker,
     "EXACT": ExactChecker,
     "GLOB": GlobChecker
 }
@@ -343,7 +347,7 @@ def add_cb(word, word_eol, userdata):
 
 @command("delchecker", 2, help_msg="Deletes a checker from the checker list and saves changes to disk")
 def del_cb(word, word_eol, userdata):
-    checker_str = word[1]
+    checker_str = word_eol[1]
     for checker in checkers:
         if checker_str == checker.str:
             checkers.remove(checker)
@@ -371,6 +375,8 @@ def manual_save_cb(word, word_eol, userdata):
 
 @msg_hook
 def on_msg(word, word_eol, userdata):
+    if len(word) < 2:
+        return hexchat.EAT_NONE
     msg = word[1]
     if any(checker.check(msg) for checker in checkers):
         word[0] = hexchat.strip(word[0])
