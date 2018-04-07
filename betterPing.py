@@ -180,7 +180,7 @@ class RegexChecker(AbstractChecker):
 
     def compile(self):
         try:
-            self.regexp = re.compile(self.str, re.IGNORECASE if self.case_sensitive else 0)
+            self.regexp = re.compile(self.str, re.IGNORECASE if not self.case_sensitive else 0)
             return True
         except re.error as e:
             print("Regex compilation error: {}".format(e))
