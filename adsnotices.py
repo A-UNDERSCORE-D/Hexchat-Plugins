@@ -125,6 +125,9 @@ def counterwhois(nick):
     hexchat.command("WHOIS {0} {0}".format(nick))
 
 
+TRANSLATE_TABLE = str.maketrans({"\x02": None, "\\": "\\\\"})
+
+
 def sendnotif(msg, ntype):
     smsg = msg.split()
     if "REMOTE" in msg:
@@ -149,9 +152,11 @@ def sendnotif(msg, ntype):
         for block in blockvisual["all"]:
             if checkblock(block):
                 return
-    children.append(subprocess.Popen(
-        ["notify-send", "-i", "hexchat", "--hint=int:transient:1",
-         title.replace("\x02", ""), body.replace("\x02", "")]))
+
+    title = title.translate(TRANSLATE_TABLE)
+    body = body.translate(TRANSLATE_TABLE)
+
+    children.append(subprocess.Popen(["notify-send", "-i", "hexchat", "--hint=int:transient:1", title, body]))
 
 
 def procleanup(userdata):
