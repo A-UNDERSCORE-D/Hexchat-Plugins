@@ -7,9 +7,6 @@ __module_version__ = "1.0"
 __module_description__ = "This script holds all my random things " \
                          "that don't fit anywhere else"
 
-print("moduld loaded: admisc")
-
-
 def poke(word, word_eol, userdata):
     pokes = ["with a stick", "with a twig"]
     innick = word[1]
@@ -62,6 +59,21 @@ def slap(word, word_eol, userdata):
                                                                chan=inchan, server=inserver, network=innetwork)))
     return hexchat.EAT_ALL
 
+def f_to_c(word, word_eol, userdata):
+    if (len(word) < 2 and word[1] != "-o") or (len(word) < 3 and word[1] == "-o"):
+        print("/ftoc requires a temprature to convert")
+        return hexchat.EAT_ALL
+    
+    output = False
+    if word[1] == "-o":
+        output = True
+    
+    if output:
+        hexchat.command(f"exec -o units 'tempF({word[2]})' tempC --one-line --verbose | perl -pe 's/\s+(.*)/\\1/'")
+    else:
+        hexchat.command(f"exec units 'tempF({word[1]})' tempC --one-line --verbose | perl -pe 's/\s+(.*)/\\1/'")
+    return hexchat.EAT_ALL
+
 
 @hexchat.hook_unload
 def onunload(userdata):
@@ -70,4 +82,5 @@ def onunload(userdata):
 
 hexchat.hook_command("poke", poke)
 hexchat.hook_command("slap", slap)
+hexchat.hook_command("ftoc", f_to_c)
 print(__module_name__, "plugin loaded")
