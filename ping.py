@@ -75,4 +75,3 @@ hexchat.hook_print("Channel Action Hilight", ping_handler("Channel Action"))
 hexchat.hook_print("Notice", incomingnotice)
 hexchat.hook_print("Receive Wallops", incomingwallops)
 print(__module_name__, "plugin loaded")
-
