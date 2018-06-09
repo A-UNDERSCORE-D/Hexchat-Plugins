@@ -35,6 +35,7 @@ class WhoReply:
 RPL_WHOREPLY, RPL_WHOEND = "352", "315"
 running = False
 hooks = [0, 0]
+count = 0
 
 
 def on_who_reply(word, word_eol, userdata: Tuple[Pattern, 'hexchat.Context']):
@@ -45,15 +46,18 @@ def on_who_reply(word, word_eol, userdata: Tuple[Pattern, 'hexchat.Context']):
         raise ValueError("on_who_reply called with an unset rline")
     if entry.test_rline(userdata[0]):
         hexchat.command(f"ECHO '{entry}' matches {userdata[0].pattern}")
+        global count
+        count += 1
 
 
 def on_who_end(word, word_eol, userdata):
     if word[3] == "0":
-        global running
+        global running, count
         running = False
         hexchat.unhook(hooks[0])
         hexchat.unhook(hooks[1])
-        userdata.command("ECHO End of trline")
+        userdata.command(f"ECHO End of trline: matched {count} users")
+        count = 0
 
 
 def trline(word, word_eol, userdata):
