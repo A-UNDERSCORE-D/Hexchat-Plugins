@@ -1,4 +1,4 @@
-local plugin_name = "spamSafety2"
+local plugin_name = "spamSafety"
 local plugin_description = "Rewrite of spamSafety, removes weird bugs"
 local plugin_version = "2.0"
 
