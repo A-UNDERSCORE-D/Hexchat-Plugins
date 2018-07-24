@@ -156,12 +156,7 @@ def sendnotif(msg, ntype):
     title = title.translate(TRANSLATE_TABLE)
     body = body.translate(TRANSLATE_TABLE)
 
-    children.append(subprocess.Popen(["notify-send", "-i", "hexchat", "--hint=int:transient:1", title, body]))
-
-
-def procleanup(userdata):
-    children[:] = [c for c in children if c.poll() is None]
-    return True
+    hexchat.command(f'TRAY -b {title} "{body}"')
 
 
 commands = OrderedDict()
@@ -567,7 +562,6 @@ def onunload(userdata):
 getconfig()
 hexchat.hook_print("Server Notice", onsnotice)
 hexchat.hook_command("SNOTE", oncmd, help="USAGE: for usage, run /snote help")
-hexchat.hook_timer(15 * 1000, procleanup)
 hexchat.hook_timer(int(whois_timeout * 1000), cleanup_whois_timers)
 menu_items()
 
