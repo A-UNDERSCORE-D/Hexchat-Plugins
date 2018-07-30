@@ -1,3 +1,4 @@
+import json
 import pickle
 import re
 from abc import ABC, abstractmethod
@@ -6,7 +7,7 @@ from collections import namedtuple
 from fnmatch import fnmatch, fnmatchcase
 from pathlib import Path
 from shlex import split
-from typing import Dict, List, Type
+from typing import Dict, List, Type, Tuple
 
 import hexchat
 
@@ -17,9 +18,22 @@ __module_description__ = "More controllable highlights"
 config = None
 config_dir = Path(hexchat.get_info("configdir")).resolve() / "adconfig"
 config_dir.mkdir(exist_ok=True)
-config_file = config_dir / "betterping.pickle"
+pickle_config_file = config_dir / "betterping.pickle"
+json_config_file = config_dir / "betterping.json"
 
 checkers = []
+checker_lut: Dict[Tuple, Type['AbstractChecker']] = {}
+
+
+def checker_type(*names):
+    def _decorate(cls):
+        checker_lut[(*names, cls.__name__)] = cls
+        return cls
+    return _decorate
+
+
+class CheckerCompileException(Exception):
+    pass
 
 
 class ListOption:
@@ -40,6 +54,10 @@ class ListOption:
         for item in to_print:
             out += indent_str + str(item) + "\n"
         return out[:-1]
+
+    @classmethod
+    def from_dict(cls, bootstrap):
+        return cls(bootstrap["entry"], bootstrap["blacklist"])
 
 
 class AbstractChecker(ABC):
@@ -158,7 +176,22 @@ class AbstractChecker(ABC):
     def type_str(self):
         return self.__class__.__name__
 
+    @classmethod
+    def from_dict(cls, bootstrap):
+        new_cls = cls(
+            bootstrap["string"],
+            bootstrap["case_sensitive"],
+            [ListOption.from_dict(entry) for entry in bootstrap["networks"]],
+            [ListOption.from_dict(entry) for entry in bootstrap["channels"]],
+            bootstrap["negate"]
+        )
+        if new_cls.compile():
+            return new_cls
+        else:
+            raise CheckerCompileException(f"Could not compile checker {new_cls}")
 
+
+@checker_type("CONTAINS")
 class ContainsChecker(AbstractChecker):
     def _check(self, str_to_check):
         if self.case_sensitive:
@@ -167,6 +200,7 @@ class ContainsChecker(AbstractChecker):
 
 
 # TODO: Maybe do some sort of timeout on the compilation here?
+@checker_type("REGEX")
 class RegexChecker(AbstractChecker):
     def __init__(self, check_str, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
@@ -193,6 +227,7 @@ class RegexChecker(AbstractChecker):
         return match is not None
 
 
+@checker_type("GLOB")
 class GlobChecker(AbstractChecker):
     def __init__(self, check_str, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
@@ -209,6 +244,7 @@ class GlobChecker(AbstractChecker):
         return fnmatch(str_to_check, self.str)
 
 
+@checker_type("EXACT")
 class ExactChecker(AbstractChecker):
     def __init__(self, check_str, case_sensitive=False, networks=None, channels=None, negate=False):
         super().__init__(
@@ -225,16 +261,63 @@ class ExactChecker(AbstractChecker):
         return self.str == str_to_check.casefold()
 
 
-def save_checkers():
-    with config_file.open("wb") as f:
-        pickle.dump(checkers, f)
+def get_checker_by_name(name):
+    for c in checker_lut:
+        if name in c:
+            return checker_lut[c]
+    return None
+
+
+class PingSerialiser(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, ListOption):
+            return {
+                "entry": obj.entry,
+                "blacklist": obj.blacklist
+            }
+        elif isinstance(obj, AbstractChecker):
+            return {
+                "type": obj.type_str,
+                "string": obj.str,
+                "case_sensitive": obj.case_sensitive,
+                "networks": obj.networks,
+                "channels": obj.channels,
+                "negate": obj.negate
+            }
+        else:
+            return super().default(obj)
+
+
+def save_checkers(to_save=None):
+    if to_save is None:
+        to_save = checkers
+    to_dump = {
+        "version": __module_version__,
+        "checkers": to_save
+    }
+    with json_config_file.open("w") as f:
+        json.dump(to_dump, f, cls=PingSerialiser, indent=2)
 
 
 def get_checkers():
-    if not config_file.exists():
-        return checkers
-    with config_file.open("rb") as f:
-        return pickle.load(f)
+    out = []
+    if not json_config_file.exists():
+        if not pickle_config_file.exists():
+            return checkers
+        with pickle_config_file.open("rb") as f:
+            unpickled_data = pickle.load(f)
+        print("Old style pickle based storage found. converting to JSON based storage and removing old file.")
+        save_checkers(unpickled_data)
+        pickle_config_file.rename(config_dir / "betterping.pickle.backup")
+
+    with json_config_file.open() as f:
+        data = json.load(f)
+    for c in data["checkers"]:
+        checker_base = get_checker_by_name(c["type"])
+        if checker_base is None:
+            raise ValueError("Unknown checker was serialized: {}".format(c["type"]))
+        out.append(checker_base.from_dict(c))
+    return out
 
 
 # Start of hexchat commands etc.
@@ -311,14 +394,6 @@ def help_cb(word, word_eol, userdata):
             print("{cmd}\t{help_text}".format(cmd=cmd, help_text=commands[cmd].help_text))
 
 
-checker_types: Dict[str, Type[AbstractChecker]] = {
-    "REGEX": RegexChecker,
-    "CONTAINS": ContainsChecker,
-    "EXACT": ExactChecker,
-    "GLOB": GlobChecker
-}
-
-# TODO: Continue implementing this
 parser = ArgumentParser(
     prog="/bping addchecker",
     description="Better word highlight support for hexchat"
@@ -367,11 +442,13 @@ def add_cb(word, word_eol, userdata):
         # -h was used or bad args passed, either way, we have nothing more to do, but we must catch SystemExit, because
         # a SystemExit will close HexChat
         return
-    if args.type not in checker_types:
-        print("{} is an unknown checker type. available types are: {}".format(args.type, ",".join(checker_types)))
+    if not get_checker_by_name(args.type):
+        print("{} is an unknown checker type. available types are: {}".format(args.type, ",".join(
+            [t[0] for t in checker_lut]
+        )))
         return
 
-    checker = checker_types[args.type](
+    checker = get_checker_by_name(args.type)(
         check_str=args.phrase,
         case_sensitive=args.case_sensitive,
         networks=build_list(args.networks, args.blacklist_networks),
