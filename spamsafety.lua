@@ -17,7 +17,6 @@ function WatcherClass:new(wname, ts, wmessage)
     lock_time = 20,
     timeout = 2,
     count = 0,
-    timer = 0,
     to_set = ts,
     triggered = false,
     message = wmessage,
