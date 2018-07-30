@@ -153,10 +153,10 @@ def sendnotif(msg, ntype):
             if checkblock(block):
                 return
 
-    title = title.translate(TRANSLATE_TABLE)
-    body = body.translate(TRANSLATE_TABLE)
+    # title = title.translate(TRANSLATE_TABLE)
+    # body = body.translate(TRANSLATE_TABLE)
 
-    hexchat.command(f'TRAY -b {title} "{body}"')
+    hexchat.command(f'TRAY -b "{title}" {body}')
 
 
 commands = OrderedDict()
