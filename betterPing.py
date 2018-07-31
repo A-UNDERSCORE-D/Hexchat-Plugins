@@ -6,7 +6,7 @@ from collections import namedtuple
 from fnmatch import fnmatch, fnmatchcase
 from pathlib import Path
 from shlex import split
-from typing import Dict, List, Type, Tuple
+from typing import Dict, List, Type, Tuple, Callable
 
 import hexchat
 
@@ -322,12 +322,53 @@ def get_checkers():
 
     with json_config_file.open() as f:
         data = json.load(f)
+
+    do_save = False
+    if data["version"] != __module_version__:
+        data = upgrade_dict(data)
+        do_save = True
+
     for c in data["checkers"]:
         checker_base = get_checker_by_name(c["type"])
         if checker_base is None:
             raise ValueError("Unknown checker was serialized: {}".format(c["type"]))
         out.append(checker_base.from_dict(c))
+
+    if do_save:
+        save_checkers(out)
+
     return out
+
+
+# start of upgrade code
+Version = Tuple[int, int, int]
+upgraders: Dict[Version, Callable] = {}
+
+
+def upgrade_dict(dict_in):
+    dict_version = dict_in["version"]
+    if dict_version == __module_version__:
+        return dict_in
+    ver_tuple: Version = tuple(int(x) for x in dict_version.split("."))
+    if ver_tuple not in upgraders:
+        raise ValueError(f"No upgrade method for version {dict_version}")
+
+    ret = upgraders[ver_tuple](dict_in)
+    return ret
+
+
+def upgrader(version: Version):
+    def _decorate(upgrade_func):
+        def upgrade_wrapper(version_dict):
+            out = upgrade_func(version_dict)
+            if out["version"] != __module_version__:
+                return upgrade_dict(out)
+            return out
+
+        upgraders[version] = upgrade_wrapper
+        return upgrade_wrapper
+
+    return _decorate
 
 
 # Start of hexchat commands etc.
