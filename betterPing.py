@@ -11,7 +11,7 @@ from typing import Dict, List, Type, Tuple
 import hexchat
 
 __module_name__ = "BetterPing"
-__module_version__ = "1.2.1"
+__module_version__ = "1.3.0"
 __module_description__ = "More controllable highlights"
 
 config = None
