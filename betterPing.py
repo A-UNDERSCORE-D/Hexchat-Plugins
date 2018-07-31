@@ -1,5 +1,4 @@
 import json
-import pickle
 import re
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser
@@ -162,7 +161,7 @@ class AbstractChecker(ABC):
     def __setstate__(self, state):
         self.str, self.case_sensitive, self.networks, self.channels, self.negate = state
         if not self.compile():
-            raise pickle.UnpicklingError("Checker {} failed to recompile".format(self))
+            raise CheckerCompileException("Checker {} failed to recompile".format(self))
         self.network_cache = {}
         self.channel_cache = {}
         self.channels_split = self.split_lists(self.channels)
@@ -305,6 +304,7 @@ def get_checkers():
         if not pickle_config_file.exists():
             return checkers
         with pickle_config_file.open("rb") as f:
+            import pickle
             unpickled_data = pickle.load(f)
         print("Old style pickle based storage found. converting to JSON based storage and removing old file.")
         save_checkers(unpickled_data)
