@@ -119,13 +119,23 @@ class AbstractChecker(ABC):
         whitelist_only = self.channels_split[1] and not self.channels_split[0]
         return self.check_list(chan_to_check, self.channels, self.channel_cache, whitelist_only)
 
-    def check_ok(self):
+    @staticmethod
+    def check_nickname(nick_to_check):
+        if nick_to_check is None:
+            print("Nick is None, skipping check")
+            return True
+        ignored_nicks = hexchat.get_prefs("irc_no_hilight").split(",")
+        nick_to_check = hexchat.strip(nick_to_check)
+        return not any(fnmatch(nick_to_check, n) for n in ignored_nicks)
+
+    def check_ok(self, nick=None):
         # There does not seem to be a way to find a channel's type without hexchat.get_list("channels")[0].type
         # Which seems rather slow, to be tested.
-        return (self.check_networks() and self.check_channels()) and not hexchat.get_info("channel").startswith(">>")
+        return (self.check_nickname(nick) and self.check_networks() and self.check_channels()) \
+               and not hexchat.get_info("channel").startswith(">>")
 
-    def check(self, str_to_check):
-        if not self.check_ok():
+    def check(self, str_to_check, src_nick=None):
+        if not self.check_ok(src_nick):
             return False
         if self.negate:
             return not self._check(str_to_check)
@@ -507,7 +517,8 @@ def on_msg(word, word_eol, userdata):
     if len(word) < 2:
         return hexchat.EAT_NONE
     msg = word[1]
-    if any(checker.check(msg) for checker in checkers):
+    nick = word[0]
+    if any(checker.check(msg, nick) for checker in checkers):
         word[0] = hexchat.strip(word[0])
         # Get the current context before emit_printing, because other plugins can change the current context
         ctx = hexchat.get_context()
