@@ -28,6 +28,7 @@ def checker_type(*names):
     def _decorate(cls):
         checker_lut[(*names, cls.__name__)] = cls
         return cls
+
     return _decorate
 
 
@@ -76,6 +77,37 @@ class AbstractChecker(ABC):
         self.channel_cache = {}
         self.network_cache = {}
 
+    def __str__(self):
+        out = f"{self.type_str}: string '{self.str}' case sensitive: {self.case_sensitive} negated: " \
+              f"{self.negate}"
+        if self.networks:
+            out += f"\n`Networks:\n{ListOption.pretty_print(self.networks)}"
+        if self.channels:
+            out += f"\n`Channels:\n{ListOption.pretty_print(self.channels)}"
+        out += "\n"
+        return out
+
+    def __repr__(self):
+        return f"{self.type_str}(check_str='{self.str}', case_sensitive={self.case_sensitive},\n " \
+               f"networks={self.networks},\n channels={self.channels}, \nnegate={self.negate})"
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return self.__str__() == other.__str__()
+
+    def __getstate__(self):
+        return self.str, self.case_sensitive, self.networks, self.channels, self.negate
+
+    def __setstate__(self, state):
+        self.str, self.case_sensitive, self.networks, self.channels, self.negate = state
+        if not self.compile():
+            raise CheckerCompileException("Checker {} failed to recompile".format(self))
+        self.network_cache = {}
+        self.channel_cache = {}
+        self.channels_split = self.split_lists(self.channels)
+        self.networks_split = self.split_lists(self.networks)
+
     @staticmethod
     def split_lists(list_in: List[ListOption]):
         return [entry for entry in list_in if not entry.blacklist], [entry for entry in list_in if entry.blacklist]
@@ -101,6 +133,15 @@ class AbstractChecker(ABC):
         cache[to_check] = ret
         return ret
 
+    @staticmethod
+    def check_nickname(nick_to_check):
+        if nick_to_check is None:
+            print("Nick is None, skipping check")
+            return True
+        ignored_nicks = hexchat.get_prefs("irc_no_hilight").split(",")
+        nick_to_check = hexchat.strip(nick_to_check)
+        return not any(fnmatch(nick_to_check, n) for n in ignored_nicks)
+
     def check_networks(self, net_to_check: str = None):
         if net_to_check is None:
             net_to_check = hexchat.get_info("network")
@@ -119,15 +160,6 @@ class AbstractChecker(ABC):
         whitelist_only = self.channels_split[1] and not self.channels_split[0]
         return self.check_list(chan_to_check, self.channels, self.channel_cache, whitelist_only)
 
-    @staticmethod
-    def check_nickname(nick_to_check):
-        if nick_to_check is None:
-            print("Nick is None, skipping check")
-            return True
-        ignored_nicks = hexchat.get_prefs("irc_no_hilight").split(",")
-        nick_to_check = hexchat.strip(nick_to_check)
-        return not any(fnmatch(nick_to_check, n) for n in ignored_nicks)
-
     def check_ok(self, nick=None):
         # There does not seem to be a way to find a channel's type without hexchat.get_list("channels")[0].type
         # Which seems rather slow, to be tested.
@@ -141,41 +173,10 @@ class AbstractChecker(ABC):
             return not self._check(str_to_check)
         return self._check(str_to_check)
 
-    def __str__(self):
-        out = f"{self.type_str}: string '{self.str}' case sensitive: {self.case_sensitive} negated: " \
-               f"{self.negate}"
-        if self.networks:
-            out += f"\n`Networks:\n{ListOption.pretty_print(self.networks)}"
-        if self.channels:
-            out += f"\n`Channels:\n{ListOption.pretty_print(self.channels)}"
-        out += "\n"
-        return out
-
-    def __repr__(self):
-        return f"{self.type_str}(check_str='{self.str}', case_sensitive={self.case_sensitive},\n " \
-               f"networks={self.networks},\n channels={self.channels}, \nnegate={self.negate})"
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return NotImplemented
-        return self.__str__() == other.__str__()
-
     def compile(self) -> bool:
         if not self.case_sensitive:
             self.str = self.str.casefold()
         return True
-
-    def __getstate__(self):
-        return self.str, self.case_sensitive, self.networks, self.channels, self.negate
-
-    def __setstate__(self, state):
-        self.str, self.case_sensitive, self.networks, self.channels, self.negate = state
-        if not self.compile():
-            raise CheckerCompileException("Checker {} failed to recompile".format(self))
-        self.network_cache = {}
-        self.channel_cache = {}
-        self.channels_split = self.split_lists(self.channels)
-        self.networks_split = self.split_lists(self.networks)
 
     @abstractmethod
     def _check(self, str_to_check: str) -> bool:
@@ -376,7 +377,6 @@ commands = {}
 command_tuple = namedtuple("command_tuple", "func help_text")
 
 
-# Because Im lazy and I think this helps readability. while removing repeated code
 def command(cmd, min_args=1, usage="{cmd} requires at least {count_args} arguments", sub_command=True, help_msg=""):
     cmd = cmd.upper()
 
