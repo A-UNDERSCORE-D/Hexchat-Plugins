@@ -577,7 +577,6 @@ def on_msg(word, word_eol, userdata):
 def onload():
     for b in VERSION_BUMPS:
         add_version_bumper(*b)
-    print(upgraders)
     global checkers
     checkers = get_checkers()
     init_parser(parser)
