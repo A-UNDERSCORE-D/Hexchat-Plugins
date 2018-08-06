@@ -139,8 +139,8 @@ class AbstractChecker(ABC):
             print("Nick is None, skipping check")
             return True
         ignored_nicks = hexchat.get_prefs("irc_no_hilight").split(",")
-        nick_to_check = hexchat.strip(nick_to_check)
-        return not any(fnmatch(nick_to_check, n) for n in ignored_nicks)
+        nick_to_check = hexchat.strip(nick_to_check).casefold()
+        return not any(fnmatch(nick_to_check, n.casefold()) for n in ignored_nicks)
 
     def check_networks(self, net_to_check: str = None):
         if net_to_check is None:
@@ -342,23 +342,22 @@ def get_checkers():
 
 
 # start of upgrade code
-Version = Tuple[int, int, int]
-upgraders: Dict[Version, Callable] = {}
+upgraders: Dict[str, Callable] = {}
+VERSION_BUMPS = (("1.2.1", "1.3.0"),)
 
 
 def upgrade_dict(dict_in):
     dict_version = dict_in["version"]
     if dict_version == __module_version__:
         return dict_in
-    ver_tuple: Version = tuple(int(x) for x in dict_version.split("."))
-    if ver_tuple not in upgraders:
+    if dict_version not in upgraders:
         raise ValueError(f"No upgrade method for version {dict_version}")
 
-    ret = upgraders[ver_tuple](dict_in)
+    ret = upgraders[dict_version](dict_in)
     return ret
 
 
-def upgrader(version: Version):
+def upgrader(version):
     def _decorate(upgrade_func):
         def upgrade_wrapper(version_dict):
             out = upgrade_func(version_dict)
@@ -370,6 +369,13 @@ def upgrader(version: Version):
         return upgrade_wrapper
 
     return _decorate
+
+
+def add_version_bumper(ver_from, ver_to):
+    @upgrader(ver_from)
+    def bump_version(dict_to_bump):
+        dict_to_bump["version"] = ver_to
+        return dict_to_bump
 
 
 # Start of hexchat commands etc.
@@ -569,6 +575,9 @@ def on_msg(word, word_eol, userdata):
 
 
 def onload():
+    for b in VERSION_BUMPS:
+        add_version_bumper(*b)
+    print(upgraders)
     global checkers
     checkers = get_checkers()
     init_parser(parser)
