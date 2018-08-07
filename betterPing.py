@@ -11,13 +11,12 @@ from typing import Dict, List, Type, Tuple, Callable
 import hexchat
 
 __module_name__ = "BetterPing"
-__module_version__ = "1.3.0"
+__module_version__ = "1.3.2"
 __module_description__ = "More controllable highlights"
 
 config = None
 config_dir = Path(hexchat.get_info("configdir")).resolve() / "adconfig"
 config_dir.mkdir(exist_ok=True)
-pickle_config_file = config_dir / "betterping.pickle"
 json_config_file = config_dir / "betterping.json"
 
 checkers = []
@@ -42,10 +41,10 @@ class ListOption:
         self.blacklist = blacklist
 
     def __str__(self):
-        return f"{'BLACKLISTED' if self.blacklist else 'WHITELISTED'}: {self.entry}"
+        return f"{'!' if self.blacklist else ''}{self.entry}"
 
     def __repr__(self):
-        return f"ListOption(entry='{self.entry}', blacklist={self.blacklist})"
+        return self.__str__()
 
     @staticmethod
     def pretty_print(to_print, indent=2):
@@ -78,18 +77,11 @@ class AbstractChecker(ABC):
         self.network_cache = {}
 
     def __str__(self):
-        out = f"{self.type_str}: string '{self.str}' case sensitive: {self.case_sensitive} negated: " \
-              f"{self.negate}"
-        if self.networks:
-            out += f"\n`Networks:\n{ListOption.pretty_print(self.networks)}"
-        if self.channels:
-            out += f"\n`Channels:\n{ListOption.pretty_print(self.channels)}"
-        out += "\n"
-        return out
+        return self.__repr__()
 
     def __repr__(self):
-        return f"{self.type_str}(check_str='{self.str}', case_sensitive={self.case_sensitive},\n " \
-               f"networks={self.networks},\n channels={self.channels}, \nnegate={self.negate})"
+        return f"{self.type_str}(check_str='{self.str}', case_sensitive={self.case_sensitive}, " \
+               f"networks={self.networks}, channels={self.channels}, negate={self.negate})"
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -312,14 +304,7 @@ def save_checkers(to_save=None):
 def get_checkers():
     out = []
     if not json_config_file.exists():
-        if not pickle_config_file.exists():
-            return checkers
-        with pickle_config_file.open("rb") as f:
-            import pickle
-            unpickled_data = pickle.load(f)
-        print("Old style pickle based storage found. converting to JSON based storage and removing old file.")
-        save_checkers(unpickled_data)
-        pickle_config_file.rename(config_dir / "betterping.pickle.backup")
+        return checkers
 
     with json_config_file.open() as f:
         data = json.load(f)
@@ -343,7 +328,11 @@ def get_checkers():
 
 # start of upgrade code
 upgraders: Dict[str, Callable] = {}
-VERSION_BUMPS = (("1.2.1", "1.3.0"),)
+VERSION_BUMPS = (
+    ("1.2.1", "1.3.0"),
+    ("1.3.0", "1.3.1"),
+    ("1.3.1", "1.3.2")
+)
 
 
 def upgrade_dict(dict_in):
@@ -541,7 +530,7 @@ def list_cb(word, word_eol, userdata):
     if not checkers:
         print("There are no currently loaded checkers")
         return
-    print("---\n".join(checker.__str__() for checker in checkers))
+    print("\n".join(str(checker) for checker in checkers))
 
 
 @command("manual_load", help_msg="Debug command used to force loading of checkers from disk")
