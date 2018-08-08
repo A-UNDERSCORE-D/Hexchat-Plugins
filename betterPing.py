@@ -11,7 +11,7 @@ from typing import Dict, List, Type, Tuple, Callable
 import hexchat
 
 __module_name__ = "BetterPing"
-__module_version__ = "1.3.2"
+__module_version__ = "1.3.3"
 __module_description__ = "More controllable highlights"
 
 config = None
@@ -53,6 +53,15 @@ class ListOption:
         for item in to_print:
             out += indent_str + str(item) + "\n"
         return out[:-1]
+
+    @classmethod
+    def from_str(cls, bootstrap: str):
+        if bootstrap.startswith("!"):
+            return cls(bootstrap[1:], True)
+        elif bootstrap.startswith("\!"):
+            return cls(bootstrap[1:])
+        else:
+            return cls(bootstrap)
 
     @classmethod
     def from_dict(cls, bootstrap):
@@ -183,8 +192,8 @@ class AbstractChecker(ABC):
         new_cls = cls(
             bootstrap["string"],
             bootstrap["case_sensitive"],
-            [ListOption.from_dict(entry) for entry in bootstrap["networks"]],
-            [ListOption.from_dict(entry) for entry in bootstrap["channels"]],
+            [ListOption.from_str(entry) for entry in bootstrap["networks"]],
+            [ListOption.from_str(entry) for entry in bootstrap["channels"]],
             bootstrap["negate"]
         )
         if new_cls.compile():
@@ -273,10 +282,7 @@ def get_checker_by_name(name):
 class PingSerialiser(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, ListOption):
-            return {
-                "entry": obj.entry,
-                "blacklist": obj.blacklist
-            }
+            return str(obj)
         elif isinstance(obj, AbstractChecker):
             return {
                 "type": obj.type_str,
@@ -358,6 +364,23 @@ def upgrader(version):
         return upgrade_wrapper
 
     return _decorate
+
+
+@upgrader("1.3.2")
+def switch_listoption_saving(u_dict):
+    u_dict["version"] = "1.3.3"
+    for checker in u_dict["checkers"]:
+        new_chans = []
+        for lo in checker["channels"]:
+            new_chans.append(str(ListOption.from_dict(lo)))
+        checker["channels"] = new_chans
+
+        new_nets = []
+        for lo in checker["networks"]:
+            new_nets.append(str(ListOption.from_dict(lo)))
+        checker["networks"] = new_nets
+
+    return u_dict
 
 
 def add_version_bumper(ver_from, ver_to):
