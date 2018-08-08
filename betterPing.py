@@ -44,7 +44,7 @@ class ListOption:
         return f"{'!' if self.blacklist else ''}{self.entry}"
 
     def __repr__(self):
-        return self.__str__()
+        return f'"{self.__str__()}"'
 
     @staticmethod
     def pretty_print(to_print, indent=2):
