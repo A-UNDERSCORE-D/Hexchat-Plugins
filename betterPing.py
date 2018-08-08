@@ -41,7 +41,10 @@ class ListOption:
         self.blacklist = blacklist
 
     def __str__(self):
-        return f"{'!' if self.blacklist else ''}{self.entry}"
+        text = self.entry
+        if self.entry.startswith("!"):
+            text = "\\" + self.entry
+        return f"{'!' if self.blacklist else ''}{text}"
 
     def __repr__(self):
         return f'"{self.__str__()}"'
