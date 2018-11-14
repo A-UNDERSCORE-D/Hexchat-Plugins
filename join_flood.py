@@ -59,7 +59,7 @@ def on_snotice(word, word_eol, userdata, attrs):
 
     joined_chan = split_snote[5]
     max_join = MAX_JOINS
-    if chan.lower() in HEAVY_CHANS:
+    if joined_chan.lower() in HEAVY_CHANS:
         max_join *= 3
 
     if joins[joined_chan].add_join(max_join):
