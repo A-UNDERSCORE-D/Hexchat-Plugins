@@ -8,26 +8,28 @@ __module_name__ = "join_flood"
 __module_version__ = "0.1"
 __module_description__ = "watches snotices for join floods and notifies the user"
 MAX_JOINS = 10
+JOIN_TIME = 10
 
+HEAVY_CHANS = ["#ChatSudcalifornianos"]
 
 class ChannelJoin:
     def __init__(self):
         self.last_join = 0
         self.join_count = 0
 
-    def add_join(self):
+    def add_join(self, max_join):
         cur_time = time.time()
-        if self.last_join - cur_time > 20:
+        if self.last_join - cur_time > JOIN_TIME:
             self.join_count = 1
 
         else:
             self.join_count += 1
 
         self.last_join = cur_time
-        return self.check_joins()
+        return self.check_joins(max_join)
 
-    def check_joins(self):
-        return self.join_count > MAX_JOINS
+    def check_joins(self, max_joins):
+        return self.join_count > max_joins
 
     def reset(self):
         self.last_join = 0
@@ -50,13 +52,17 @@ def on_snotice(word, word_eol, userdata, attrs):
     if len(split_snote) < 1 or split_snote[1][:-1] not in ("JOIN", "REMOTEJOIN"):
         return
 
-    if cur_time - attrs.time > 10:
+    if attrs.time != 0 and cur_time - attrs.time > 10:
         print(
             f"Ignoring snote {snote!r} as there is a time discrepancy of more than ten seconds: {attrs.time - cur_time}"
         )
 
     joined_chan = split_snote[5]
-    if joins[joined_chan].add_join():
+    max_join = MAX_JOINS
+    if chan.lower() in HEAVY_CHANS:
+        max_join *= 3
+
+    if joins[joined_chan].add_join(max_join):
         hexchat.command(
             f"RECV :JoinFlood!lol@no NOTICE {hexchat.get_info('nick')} :Join spam detected in {joined_chan}"
         )
