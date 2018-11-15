@@ -10,7 +10,7 @@ __module_description__ = "watches snotices for join floods and notifies the user
 MAX_JOINS = 10
 JOIN_TIME = 10
 
-HEAVY_CHANS = ["#ChatSudcalifornianos"]
+HEAVY_CHANS = ["#chatsudcalifornianos"]
 
 class ChannelJoin:
     def __init__(self):
