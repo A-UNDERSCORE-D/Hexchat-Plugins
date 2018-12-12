@@ -11,6 +11,8 @@ MAX_JOINS = 10
 JOIN_TIME = 10
 
 HEAVY_CHANS = ["#chatsudcalifornianos"]
+IGNORED_CHANS = ["#chatsudcalifornianos"]
+
 
 class ChannelJoin:
     def __init__(self):
@@ -59,6 +61,10 @@ def on_snotice(word, word_eol, userdata, attrs):
 
     joined_chan = split_snote[5]
     max_join = MAX_JOINS
+
+    if joined_chan.lower() in IGNORED_CHANS:
+        return
+
     if joined_chan.lower() in HEAVY_CHANS:
         max_join *= 3
 
