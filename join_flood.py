@@ -11,7 +11,7 @@ MAX_JOINS = 10
 JOIN_TIME = 10
 
 HEAVY_CHANS = ["#chatsudcalifornianos"]
-IGNORED_CHANS = ["#chatsudcalifornianos"]
+IGNORED_CHANS = ["#chatsudcalifornianos", "##fix-your-connection"]
 
 
 class ChannelJoin:
