@@ -20,7 +20,6 @@ waiting_on_response = False
 waiting_on_message = False
 message = ""
 to_paste = ""
-threads = []
 
 paste_target = "https://paste.ferricyanide.solutions"
 
@@ -53,6 +52,7 @@ def on_key(word, word_eol, userdata):
 
 
 def grab_message():
+    print("type the message and hit enter")
     global waiting_on_message
     waiting_on_message = True
     return hexchat.EAT_HEXCHAT
