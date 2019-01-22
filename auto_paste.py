@@ -73,6 +73,7 @@ def start_paste():
     t.start()
     waiting_on_response = False
     message = ""
+    return hexchat.EAT_HEXCHAT
 
 
 def dump_lines():
@@ -86,6 +87,8 @@ def dump_lines():
             hexchat.command(line[1:])
         else:
             hexchat.command(f"say {line}")
+
+    return hexchat.EAT_HEXCHAT
 
 
 def on_enter():
