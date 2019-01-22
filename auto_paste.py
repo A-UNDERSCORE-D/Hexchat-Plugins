@@ -100,8 +100,8 @@ def on_enter():
         start_paste()
         return hexchat.EAT_HEXCHAT
 
-    if count_newlines(ib) > 2:
-        print("multiline text detected. paste? yes, no, message, cancel y/n/m/c")
+    if count_newlines(ib) > 5:
+        print("multiline text detected. paste? yes, no, message, cancel, send as lines y/n/m/c/p")
         clear_inputbox()
         global to_paste
         to_paste = ib
