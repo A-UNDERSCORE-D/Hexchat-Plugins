@@ -67,7 +67,7 @@ def start_paste():
     print("pasting data")
     global waiting_on_response, message
     t = threading.Thread(
-        target=do_paste, args=[hexchat.get_context(), to_paste, message]
+        target=do_paste, args=[hexchat.get_info("channel"), to_paste, message]
     )
     t.daemon = True
     t.start()
@@ -130,7 +130,7 @@ def count_newlines(string):
     return count
 
 
-def do_paste(ctx, str_to_paste, msg):
+def do_paste(target, str_to_paste, msg):
     res = requests.post(paste_target + "/documents", data=str_to_paste)
     if res.status_code != 200:
         print(f"Paste failed: {res}")
@@ -138,9 +138,9 @@ def do_paste(ctx, str_to_paste, msg):
     key = res.json()["key"]
     url = f"{paste_target}/{key}"
     if msg:
-        ctx.command(f"say {msg} {url}")
+        hexchat.command(f"msg {target} {msg} {url}")
     else:
-        ctx.command(f"say I sent a bunch of lines at once: {url}")
+        hexchat.command(f"msg {target} I sent a bunch of lines at once: {url}")
 
 
 @hexchat.hook_unload
