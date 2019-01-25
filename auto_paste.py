@@ -91,26 +91,33 @@ def dump_lines():
     return hexchat.EAT_HEXCHAT
 
 
+def paste_detected(input_box):
+    print("multiline text detected. paste? yes, no, message, cancel, send as lines y/n/m/c/p")
+    clear_inputbox()
+    global to_paste
+    to_paste = input_box
+    global waiting_on_response
+    waiting_on_response = True
+    return hexchat.EAT_HEXCHAT
+
+
+def message_detected(input_box):
+    global message, waiting_on_message
+    message = input_box
+    waiting_on_message = False
+    print("added message")
+    clear_inputbox()
+    start_paste()
+    return hexchat.EAT_HEXCHAT
+
+
 def on_enter():
     ib = get_inputbox()
-    global waiting_on_message
     if waiting_on_message:
-        global message
-        message = ib
-        waiting_on_message = False
-        print("added message")
-        clear_inputbox()
-        start_paste()
-        return hexchat.EAT_HEXCHAT
+        message_detected(ib)
 
     if count_newlines(ib) > 5:
-        print("multiline text detected. paste? yes, no, message, cancel, send as lines y/n/m/c/p")
-        clear_inputbox()
-        global to_paste
-        to_paste = ib
-        global waiting_on_response
-        waiting_on_response = True
-        return hexchat.EAT_HEXCHAT
+        return paste_detected(ib)
 
 
 def get_inputbox():
@@ -143,11 +150,16 @@ def do_paste(target, str_to_paste, msg):
         hexchat.command(f"msg {target} I sent a bunch of lines at once: {url}")
 
 
+def paste_cmd(word, word_eol, userdata):
+    return paste_detected(word_eol[1])
+
+
 @hexchat.hook_unload
 def onunload(userdata):
     print(__module_name__, "unloaded")
 
 
 hexchat.hook_print("Key Press", on_key)
+hexchat.hook_command("PASTE", paste_cmd)
 
 print(__module_name__, "loaded")
