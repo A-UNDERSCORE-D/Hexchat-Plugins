@@ -64,10 +64,14 @@ def cancel():
 
 
 def start_paste():
-    print("pasting data")
+    target_channel = hexchat.get_info("channel")
+    target_network = hexchat.get_info("network")
+    print(f"pasting data to {target_channel} on {target_network}")
     global waiting_on_response, message
     t = threading.Thread(
-        target=do_paste, args=[hexchat.get_info("channel"), to_paste, message]
+        target=do_paste, args=[
+            target_channel, target_network, to_paste, message
+        ]
     )
     t.daemon = True
     t.start()
@@ -137,17 +141,23 @@ def count_newlines(string):
     return count
 
 
-def do_paste(target, str_to_paste, msg):
-    res = requests.post(paste_target + "/documents", data=str_to_paste)
+def do_paste(target_channel, target_network, str_to_paste, msg):
+    res = requests.post(paste_target + "/documents", data=str_to_paste.encode("utf-8"))
     if res.status_code != 200:
         print(f"Paste failed: {res}")
         return
     key = res.json()["key"]
     url = f"{paste_target}/{key}"
+    target_ctx = hexchat.find_context(target_network, target_channel)
+    if target_ctx is None:
+        hexchat.command("ECHO could not find target. Pasting string here instead")
+        hexchat.command(f"ECHO {msg} {url}")
+        return
+
     if msg:
-        hexchat.command(f"msg {target} {msg} {url}")
+        target_ctx.command(f"say {msg} {url}")
     else:
-        hexchat.command(f"msg {target} I sent a bunch of lines at once: {url}")
+        target_ctx.command(f"say I sent a bunch of lines at once: {url}")
 
 
 def paste_cmd(word, word_eol, userdata):
