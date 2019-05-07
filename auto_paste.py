@@ -153,18 +153,15 @@ def do_paste(target_ctx, str_to_paste, msg):
 
 
 def show_paste(target_ctx, msg, url):
-    print("show_paste called")
     if not target_ctx.set():
         hexchat.command("ECHO could not find target. Pasting string here instead")
         hexchat.command(f"ECHO {msg} {url}")
-        print("returning from show_paste")
         return False
 
     if msg:
         hexchat.command(f"say {msg} {url}")
     else:
         hexchat.command(f"say I sent a bunch of lines at once: {url}")
-    print("returning from show_paste 2")
     return False
 
 
