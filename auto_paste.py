@@ -2,6 +2,7 @@ import threading
 
 import hexchat
 import requests
+from gi.repository import GLib
 
 __module_name__ = "auto_paste"
 __module_version__ = "0.1"
@@ -70,7 +71,7 @@ def start_paste():
     global waiting_on_response, message
     t = threading.Thread(
         target=do_paste, args=[
-            target_channel, target_network, to_paste, message
+            hexchat.get_context(), to_paste, message
         ]
     )
     t.daemon = True
@@ -141,23 +142,30 @@ def count_newlines(string):
     return count
 
 
-def do_paste(target_channel, target_network, str_to_paste, msg):
+def do_paste(target_ctx, str_to_paste, msg):
     res = requests.post(paste_target + "/documents", data=str_to_paste.encode("utf-8"))
     if res.status_code != 200:
         print(f"Paste failed: {res}")
         return
     key = res.json()["key"]
     url = f"{paste_target}/{key}"
-    target_ctx = hexchat.find_context(target_network, target_channel)
-    if target_ctx is None:
+    GLib.idle_add(show_paste, target_ctx, msg, url)
+
+
+def show_paste(target_ctx, msg, url):
+    print("show_paste called")
+    if not target_ctx.set():
         hexchat.command("ECHO could not find target. Pasting string here instead")
         hexchat.command(f"ECHO {msg} {url}")
-        return
+        print("returning from show_paste")
+        return False
 
     if msg:
-        target_ctx.command(f"say {msg} {url}")
+        hexchat.command(f"say {msg} {url}")
     else:
-        target_ctx.command(f"say I sent a bunch of lines at once: {url}")
+        hexchat.command(f"say I sent a bunch of lines at once: {url}")
+    print("returning from show_paste 2")
+    return False
 
 
 def paste_cmd(word, word_eol, userdata):
