@@ -3,7 +3,7 @@ from typing import Dict, List, NamedTuple, Pattern
 import hexchat  # type: ignore # It exists PyLance, I promise
 # spell-checker: words snote, xline, dnsbl, sacommand, sacommands, xlines, oper, SQUIT, opers
 __module_name__ = "snote_forward"
-__module_version__ = "2.1.2"
+__module_version__ = "2.1.3"
 __module_description__ = ""
 
 
@@ -24,7 +24,8 @@ SNOTE_MATCHES: Dict[str, List[SnoteMatcher]] = {
     "xline": [
         SnoteMatcher('added/expired xline',
                      re.compile(r'^\*\*\*\s(Soft|Permanent|Expiring)?( Global)?\s?([QGZK]-Line|Exception).*$')),
-        SnoteMatcher('removed xline', re.compile(r'^\*\*\* \S+ removed (Global )?([QGZK]-Line|Exception).*$')),
+        # *** brendo!brendo@opers.brendo.org/brendo removed exception on *@23.95.173.171 (set at Tue Jun 22 20:02:08 2021 - reason: fuck you)
+        SnoteMatcher('removed xline', re.compile(r'^\*\*\* \S+ removed (Global )?([QGZK]-Line|[Ee]xception).*$')),
         spamfilter
     ],
     "connect": [
