@@ -24,7 +24,6 @@ SNOTE_MATCHES: Dict[str, List[SnoteMatcher]] = {
     "xline": [
         SnoteMatcher('added/expired xline',
                      re.compile(r'^\*\*\*\s(Soft|Permanent|Expiring)?( Global)?\s?([QGZK]-Line|Exception).*$')),
-        # *** brendo!brendo@opers.brendo.org/brendo removed exception on *@23.95.173.171 (set at Tue Jun 22 20:02:08 2021 - reason: fuck you)
         SnoteMatcher('removed xline', re.compile(r'^\*\*\* \S+ removed (Global )?([QGZK]-Line|[Ee]xception).*$')),
         spamfilter
     ],
