@@ -12,7 +12,7 @@ from typing import Any, Dict, List, NamedTuple, Optional
 import hexchat
 
 __module_name__ = 'better_ping_2'
-__module_version__ = '0.1.1'
+__module_version__ = '0.1.2'
 __module_description__ = 'More controllable highlights'
 
 config_dir = pathlib.Path(str(hexchat.get_info("configdir"))).resolve() / "adconfig"
@@ -60,6 +60,10 @@ class AbstractChecker(ABC):
     def check(self, msg: str, source_nick: str, source_channel: str = None, source_network: str = None) -> bool:
         source_channel = source_channel if source_channel is not None else str(hexchat.get_info('channel'))
         source_network = source_network if source_network is not None else str(hexchat.get_info('network'))
+
+        if source_channel.startswith(">>") and source_channel.endswith("<<"):
+            return False  # dont match on magic channels
+
         if not (
             self.nicks.check(hexchat.strip(source_nick))
             and self.channels.check(source_channel)
