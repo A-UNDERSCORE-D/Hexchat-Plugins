@@ -308,6 +308,8 @@ def on_message(word, word_eol, userdata):
         ctx.command("GUI COLOR 3")
         return hexchat.EAT_ALL
 
+    return hexchat.EAT_NONE
+
 
 hexchat.hook_print("Channel Message", on_message, userdata="Channel Msg Hilight")
 hexchat.hook_print("Channel Action", on_message, userdata="Channel Action Hilight")
