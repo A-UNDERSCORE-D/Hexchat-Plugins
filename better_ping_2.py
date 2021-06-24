@@ -229,6 +229,10 @@ def list_checkers(args):
 
 
 def save_checkers():
+    if not config_file.exists():
+        # none to load
+        return
+
     with config_file.open('w') as f:
         json.dump([c.to_dict() for c in checkers], f, indent=4)
 
