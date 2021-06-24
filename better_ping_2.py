@@ -12,7 +12,7 @@ from typing import Any, Dict, List, NamedTuple, Optional
 import hexchat
 
 __module_name__ = 'better_ping_2'
-__module_version__ = '0.1.2'
+__module_version__ = '0.1.3'
 __module_description__ = 'More controllable highlights'
 
 config_dir = pathlib.Path(str(hexchat.get_info("configdir"))).resolve() / "adconfig"
@@ -141,10 +141,12 @@ class GlobChecker(AbstractChecker):
         super().__init__(check_str, nicks, networks, channels, case_sensitive=case_sensitive, type='glob')
 
     def _check(self, str_to_check):
+        if self.check_str == '*':
+            return True  # Quick and dirty speedup
+
         if self.case_sensitive:
             return fnmatchcase(str_to_check, self.check_str)
 
-        print(f'{str_to_check=}  {self.check_str=}   {fnmatch(str_to_check, self.check_str)=}')
         return fnmatch(str_to_check, self.check_str)
 
 
